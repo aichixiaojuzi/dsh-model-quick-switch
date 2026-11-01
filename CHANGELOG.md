@@ -2,6 +2,16 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [0.1.1] - 2026-11-02
+
+### 变更
+
+- **npm 包名改为作用域包** `@aichixiaojuzi/dsh-model-quick-switch`。npm 的防混淆规则判定
+  `dsh-model-quick-switch` 与已存在的 `dsh-model-quickswitch` 去掉连字符后完全同形
+  （均为 `dshmodelquickswitch`），因此拒绝了普通包名。仓库名、插件功能和本地安装方式都不变。
+- 安装命令随之变为
+  `dsh plugin --profile <desktop|web> add @aichixiaojuzi/dsh-model-quick-switch`。
+
 ## [0.1.0] - 2026-11-01
 
 首个公开版本。
@@ -35,4 +45,5 @@
 
 见 README 的「已知限制」一节。
 
+[0.1.1]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.0

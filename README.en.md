@@ -1,8 +1,8 @@
 # Quick Model Switch
 
 [![CI](https://github.com/aichixiaojuzi/dsh-model-quick-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-model-quick-switch.svg)](https://www.npmjs.com/package/dsh-model-quick-switch)
-[![license](https://img.shields.io/npm/l/dsh-model-quick-switch.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@aichixiaojuzi/dsh-model-quick-switch.svg)](https://www.npmjs.com/package/@aichixiaojuzi/dsh-model-quick-switch)
+[![license](https://img.shields.io/npm/l/@aichixiaojuzi/dsh-model-quick-switch.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/LICENSE)
 
 A DSH Web client plugin that replaces the composer's **Model** menu with a
 **provider-first, two-pane panel**.
@@ -23,10 +23,10 @@ are all yours to arrange.
 
 ```powershell
 # desktop app (profile named "desktop")
-dsh plugin --profile desktop add dsh-model-quick-switch
+dsh plugin --profile desktop add @aichixiaojuzi/dsh-model-quick-switch
 
 # web profile
-dsh plugin --profile web add dsh-model-quick-switch
+dsh plugin --profile web add @aichixiaojuzi/dsh-model-quick-switch
 ```
 
 Or search for `dsh-model-quick-switch` in the in-app **plugin market**.

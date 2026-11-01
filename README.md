@@ -1,8 +1,8 @@
 # 模型快捷切换 · Quick Model Switch
 
 [![CI](https://github.com/aichixiaojuzi/dsh-model-quick-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/actions/workflows/ci.yml)
-[![npm](https://img.shields.io/npm/v/dsh-model-quick-switch.svg)](https://www.npmjs.com/package/dsh-model-quick-switch)
-[![license](https://img.shields.io/npm/l/dsh-model-quick-switch.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/LICENSE)
+[![npm](https://img.shields.io/npm/v/@aichixiaojuzi/dsh-model-quick-switch.svg)](https://www.npmjs.com/package/@aichixiaojuzi/dsh-model-quick-switch)
+[![license](https://img.shields.io/npm/l/@aichixiaojuzi/dsh-model-quick-switch.svg)](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/LICENSE)
 
 一个 DSH Web 客户端插件：把输入框工具行里的「模型」菜单换成**供应商优先的双栏面板**。
 
@@ -19,10 +19,10 @@
 
 ```powershell
 # 桌面端（profile 名为 desktop）
-dsh plugin --profile desktop add dsh-model-quick-switch
+dsh plugin --profile desktop add @aichixiaojuzi/dsh-model-quick-switch
 
 # Web 端（profile 名为 web）
-dsh plugin --profile web add dsh-model-quick-switch
+dsh plugin --profile web add @aichixiaojuzi/dsh-model-quick-switch
 ```
 
 也可以在 GUI 的**插件市场**里搜 `dsh-model-quick-switch` 安装。
