@@ -1,0 +1,16 @@
+# 依赖与构建产物
+node_modules/
+package-lock.json
+pnpm-lock.yaml
+*.tgz
+
+# 本地分析 / 临时产物，绝不入库
+_research/
+dev/tmp/
+*.log
+
+# 编辑器与系统
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

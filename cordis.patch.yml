@@ -1,0 +1,4 @@
+- insert:
+    - id: model-quick-switch
+      name: 'dsh-model-quick-switch'
+      config: {}

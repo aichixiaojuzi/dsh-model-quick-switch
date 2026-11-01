@@ -1,0 +1,71 @@
+{
+  "name": "dsh-model-quick-switch",
+  "version": "0.1.0",
+  "description": "Provider-first model switcher for the DSH composer. 输入框里的双栏模型切换器：所有供应商一级可见，可拖动排序、别名、收藏与最近使用。",
+  "license": "MIT",
+  "author": "aichixiaojuzi",
+  "type": "module",
+  "homepage": "https://github.com/aichixiaojuzi/dsh-model-quick-switch#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aichixiaojuzi/dsh-model-quick-switch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aichixiaojuzi/dsh-model-quick-switch/issues"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "deepseek",
+    "model-switcher",
+    "model-picker",
+    "provider",
+    "ui"
+  ],
+  "engines": {
+    "node": ">=22",
+    "dsh": ">=0.2.1-rc.4"
+  },
+  "scripts": {
+    "test": "node dev/smoke.mjs",
+    "check": "node --check client.js && node --check index.js"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "assets/icon-180.png",
+    "README.md",
+    "README.en.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "icon": "./icon.svg",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "slots",
+        "sessions",
+        "remote",
+        "remote.session",
+        "modelDirectories",
+        "locale"
+      ]
+    }
+  }
+}

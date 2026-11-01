@@ -1,0 +1,9 @@
+# Keep the repository LF-only so the Linux CI and Windows checkouts agree.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending translated.
+*.png binary
+*.jpg binary
+*.webp binary
+*.tgz binary
+*.ico binary

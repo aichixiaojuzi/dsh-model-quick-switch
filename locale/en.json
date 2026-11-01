@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Quick Model Switch",
+    "description": "Replaces the composer's model menu with a provider-first panel: every provider on the left, its models on the right, drag to reorder, star to pin."
+  }
+}
