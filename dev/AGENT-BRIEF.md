@@ -81,8 +81,13 @@ Trusted Publisher 已在 npmjs.com 配好并用一次 `workflow_dispatch` 验证
 从 tag 跑才真正发布。
 前提是 npmjs.com 上该包已配好 Trusted Publisher，四个字段必须与
 `publish.yml` 顶部注释完全一致（org/user、repo、workflow 文件名、environment），
-否则 npm 会用 **E404** 拒绝。备用方案（OIDC 不可用时）见
-`..\_publish\PUBLISH-STEPS.md` 的 2FA 豁免令牌流程。
+否则 npm 会用 **E404** 拒绝。信任关系改过之后**必须同步改 npm 上的配置**。
+
+包的 **Publishing access** 已设为「Require two-factor authentication and disallow
+bypass 2fa tokens」，所以**一次性令牌再也发不了版**——不要试图再造令牌，那条路已关闭。
+真要临时绕过（例如 OIDC 出故障）：用通行密钥在 `/package/<name>/access` 页面把该
+选项临时改回宽松项，或在 npm 账号上补一个 TOTP 认证器（本账号目前只有通行密钥，
+所以命令行 `npm trust` / 带 OTP 的 `npm publish` 都不可用）。
 
 ## 未完成的线程 / 状态
 
