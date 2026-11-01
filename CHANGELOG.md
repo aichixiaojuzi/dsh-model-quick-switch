@@ -12,6 +12,8 @@
 - CI 的动作升级到 `actions/checkout@v7` 与 `actions/setup-node@v7`
   （v4 跑在已被强制升级的 Node 20 上，会产生弃用警告）。
 - 这两项都只影响仓库，不入 npm 包（`files` 白名单不含 `.github/`）。
+- Trusted Publisher 已在 npmjs.com 配置并验证通过（手动触发一次，认证成功、
+  因 0.1.3 已存在而如预期停止）。从分支手动触发只做打包检查，不写 registry。
 
 ## [0.1.3] - 2026-11-02
 

@@ -62,4 +62,10 @@ jobs:
         run: node dev/smoke.mjs
 
       - name: Publish to npm
+        if: github.ref_type == 'tag'
         run: npm publish
+
+      # Manual dispatch from a branch: pack only, never write to the registry.
+      - name: Dry run (branch dispatch does not publish)
+        if: github.ref_type != 'tag'
+        run: npm publish --dry-run

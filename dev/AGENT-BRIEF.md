@@ -75,6 +75,10 @@ git push origin v0.1.4
 ```
 
 发布走 npm **Trusted Publishing（OIDC）**：仓库、GitHub secrets、本机都**没有**令牌。
+Trusted Publisher 已在 npmjs.com 配好并用一次 `workflow_dispatch` 验证通过
+（探针停在 `cannot publish over 0.1.3` 即认证成功；**E404 才是不匹配**）。
+配好之后 `workflow_dispatch` 从分支手动跑只做打包检查（不写 registry），
+从 tag 跑才真正发布。
 前提是 npmjs.com 上该包已配好 Trusted Publisher，四个字段必须与
 `publish.yml` 顶部注释完全一致（org/user、repo、workflow 文件名、environment），
 否则 npm 会用 **E404** 拒绝。备用方案（OIDC 不可用时）见
