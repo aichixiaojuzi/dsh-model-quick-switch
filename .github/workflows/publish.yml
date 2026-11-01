@@ -65,7 +65,9 @@ jobs:
         if: github.ref_type == 'tag'
         run: npm publish
 
-      # Manual dispatch from a branch: pack only, never write to the registry.
-      - name: Dry run (branch dispatch does not publish)
+      # Manual dispatch from a branch: list what would be packed, never contact the
+      # registry. "npm publish --dry-run" is NOT used here: it still runs the publish
+      # auth preflight, which has no usable credential outside a real OIDC publish.
+      - name: Pack check (branch dispatch does not publish)
         if: github.ref_type != 'tag'
-        run: npm publish --dry-run
+        run: npm pack --dry-run
