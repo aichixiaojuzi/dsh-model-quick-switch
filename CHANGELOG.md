@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [0.1.3] - 2026-11-02
+
+### 文档
+
+- README 的示意图由一张换成两张：① 插件在输入框工具行的位置、② 点开后展开的完整面板。
+  `assets/panel.png` 已删除，新图是 `assets/panel-1.png` 与 `assets/panel-2.png`。
+- `screenshots.json` 同步列出这两张图（插件市场的卡片就是读这个文件，所以以后换图
+  不需要再提 PR）。功能代码没有任何改动。
+
 ## [0.1.2] - 2026-11-02
 
 ### 修复
@@ -54,6 +63,7 @@
 
 见 README 的「已知限制」一节。
 
+[0.1.3]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.0
