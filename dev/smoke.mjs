@@ -13,6 +13,7 @@ import { dirname, join } from 'node:path'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const source = readFileSync(join(here, '..', 'client.js'), 'utf8')
+const manifest = JSON.parse(readFileSync(join(here, '..', 'package.json'), 'utf8'))
 
 /* ------------------------------------------------------------------ stubs */
 
@@ -219,7 +220,10 @@ function runScenario(name, seed, extra) {
 /* ------------------------------------------------------------------- main */
 
 new Function('window', 'document', 'require', source)(windowStub, documentStub, requireStub)
-if (!loaded || loaded.id !== 'dsh-model-quick-switch') throw new Error('smoke: module loader did not capture the definition')
+if (!loaded) throw new Error('smoke: module loader did not capture the definition')
+if (loaded.id !== manifest.name) {
+  throw new Error(`smoke: the client module id must equal the package name (module "${loaded.id}", package "${manifest.name}")`)
+}
 const module = loaded.factory(requireStub)
 
 let registration = null

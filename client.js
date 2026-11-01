@@ -9,7 +9,7 @@
  * and this seat never disagree, and a Host rejection surfaces inline.
  */
 window.__ModuleLoader__.load({
-  id: 'dsh-model-quick-switch',
+  id: '@aichixiaojuzi/dsh-model-quick-switch',
   factory(require) {
     const React = require('react')
     const { useCallback, useEffect, useRef, useState } = React

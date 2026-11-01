@@ -2,6 +2,15 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [0.1.2] - 2026-11-02
+
+### 修复
+
+- **改名后客户端半片加载失败、面板消失**。客户端的模块 id 必须与包名完全一致
+  （`@local/sidebar-focus-panel`、`@ace-zone/dsh-market` 都是这个约定），0.1.1 只改了包名、
+  没同步这个 id，于是渲染器报 `import failed`，输入框里的面板不再出现。现已把 id 改成完整
+  作用域包名，并在冒烟测试里加了一条「模块 id 必须等于 `package.json` 的 `name`」的回归断言。
+
 ## [0.1.1] - 2026-11-02
 
 ### 变更
@@ -45,5 +54,6 @@
 
 见 README 的「已知限制」一节。
 
+[0.1.2]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.2
 [0.1.1]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.1
 [0.1.0]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.0
