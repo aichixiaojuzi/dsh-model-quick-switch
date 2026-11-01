@@ -7,7 +7,13 @@
 A DSH Web client plugin that replaces the composer's **Model** menu with a
 **provider-first, two-pane panel**.
 
-![Panel overview](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel.png)
+![Where the plugin sits in the composer](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel-1.png)
+
+*① A new session — the plugin takes over the Model seat in the composer's tool row*
+
+![The full panel, expanded](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel-2.png)
+
+*② The panel expanded — every provider in the left rail, the selected provider's models on the right*
 
 [中文说明](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/README.md) · [Changelog](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/CHANGELOG.md) · [Contributing](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/CONTRIBUTING.md)
 

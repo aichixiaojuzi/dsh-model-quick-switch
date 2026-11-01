@@ -6,7 +6,13 @@
 
 一个 DSH Web 客户端插件：把输入框工具行里的「模型」菜单换成**供应商优先的双栏面板**。
 
-![面板全貌](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel.png)
+![插件在输入框工具行的位置](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel-1.png)
+
+*① 新会话界面：插件就装在输入框工具行的「模型」位置*
+
+![点开后展开的完整面板](https://raw.githubusercontent.com/aichixiaojuzi/dsh-model-quick-switch/main/assets/panel-2.png)
+
+*② 点开后展开的完整面板：左侧是所有供应商，右侧是该供应商的模型*
 
 [English](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/README.en.md) · [更新日志](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/CHANGELOG.md) · [参与贡献](https://github.com/aichixiaojuzi/dsh-model-quick-switch/blob/main/CONTRIBUTING.md)
 
