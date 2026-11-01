@@ -2,6 +2,17 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [未发布]
+
+### 工程
+
+- 新增 `.github/workflows/publish.yml`：推 `v*` 标签即由 GitHub Actions 通过 npm
+  **Trusted Publishing（OIDC）** 发布，仓库与 GitHub secrets 里不再存放任何 npm 令牌。
+  发布前会校验「标签版本 == `package.json` 版本」并跑一遍冒烟测试。
+- CI 的动作升级到 `actions/checkout@v7` 与 `actions/setup-node@v7`
+  （v4 跑在已被强制升级的 Node 20 上，会产生弃用警告）。
+- 这两项都只影响仓库，不入 npm 包（`files` 白名单不含 `.github/`）。
+
 ## [0.1.3] - 2026-11-02
 
 ### 文档

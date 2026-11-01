@@ -1,0 +1,65 @@
+name: Release
+
+# Publishing happens from CI only. Push a v* tag and this workflow publishes to npm
+# through Trusted Publishing (OIDC) - there is no npm token anywhere in this repo or
+# in GitHub secrets. Configure the matching Trusted Publisher on npmjs.com first:
+#
+#   Publisher            GitHub Actions
+#   Organization / user  aichixiaojuzi
+#   Repository           dsh-model-quick-switch
+#   Workflow filename    publish.yml
+#   Environment          (leave empty)
+#
+# A mismatch in any of those four values makes npm reject the publish with E404.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for Trusted Publishing (OIDC)
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          # Trusted Publishing needs npm >= 11.5.1; Node 24 bundles a compatible npm.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          # There are no dependencies to cache, and a poisoned cache could expose the
+          # OIDC token to code we do not control.
+          package-manager-cache: false
+
+      - name: Tag must match package.json version
+        if: github.ref_type == 'tag'
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./package.json').version")"
+          echo "tag=$tag package.json=$pkg"
+          if [ "$tag" != "$pkg" ]; then
+            echo "::error::tag v$tag does not match package.json version $pkg"
+            exit 1
+          fi
+
+      - name: Tool versions
+        run: |
+          node --version
+          npm --version
+
+      - name: Syntax check
+        run: |
+          node --check client.js
+          node --check index.js
+          node --check dev/smoke.mjs
+
+      - name: Smoke test
+        run: node dev/smoke.mjs
+
+      - name: Publish to npm
+        run: npm publish

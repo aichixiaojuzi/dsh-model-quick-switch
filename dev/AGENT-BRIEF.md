@@ -65,15 +65,30 @@ node dev\smoke.mjs                                     # 自测（必须全绿�
 & $node $pnpm view @aichixiaojuzi/dsh-model-quick-switch version repository.url
 ```
 
-发布流程见 `..\_publish\PUBLISH-STEPS.md`（含 2FA 豁免令牌的完整步骤）。
+## 发布（推 tag 即发布，无需任何令牌）
+
+```powershell
+# 1. 改 package.json 的 version + 补 CHANGELOG 小节（tag 会校验两者一致）
+# 2. 提交，打 tag，推送；推 tag 会触发 .github/workflows/publish.yml
+git push origin main
+git push origin v0.1.4
+```
+
+发布走 npm **Trusted Publishing（OIDC）**：仓库、GitHub secrets、本机都**没有**令牌。
+前提是 npmjs.com 上该包已配好 Trusted Publisher，四个字段必须与
+`publish.yml` 顶部注释完全一致（org/user、repo、workflow 文件名、environment），
+否则 npm 会用 **E404** 拒绝。备用方案（OIDC 不可用时）见
+`..\_publish\PUBLISH-STEPS.md` 的 2FA 豁免令牌流程。
 
 ## 未完成的线程 / 状态
 
 - **收录 PR**（`awesome-dsh-plugin/awesome-dsh-plugin`）：仓库满 24 小时后才能提
   （**2026-11-03 00:12** 之后）。条目草案 `_publish\catalog-entry.yml`；
   规则核实见 `_publish\CATALOG-SPEC.md`；操作指引见 `_publish\PR-STEPS.md`。
-- npm 上的 **0.1.1 有缺陷**（客户端 id 未随改名同步），不要使用；`latest` 已是 0.1.2。
-- 发布用的 **2FA 豁免令牌是一次性的**，发完即删；下次发布要新造一个。
+- npm 上的 **0.1.1 有缺陷**（客户端 id 未随改名同步），不要使用；`latest` 已是 0.1.3。
+- 发布改成 **`publish.yml` + Trusted Publishing**；`_publish\PUBLISH-STEPS.md` 里的一次性
+  2FA 令牌流程只作为备用。改发布工作流文件名时，**必须同步改 npmjs.com 上的
+  Trusted Publisher 配置**，否则发布报 E404。
 - 本地 profile 已同步到作用域包名；`_publish\` 目录在仓库之外，**不要**提交进仓库
   （里面含发布笔记与临时产物）。
 
