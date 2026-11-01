@@ -65,9 +65,11 @@ jobs:
         if: github.ref_type == 'tag'
         run: npm publish
 
-      # Manual dispatch from a branch: list what would be packed, never contact the
-      # registry. "npm publish --dry-run" is NOT used here: it still runs the publish
-      # auth preflight, which has no usable credential outside a real OIDC publish.
+      # Manual dispatch from a branch: list what would be packed, without contacting
+      # the registry. "npm publish --dry-run" is deliberately NOT used: it still runs
+      # the registry-side publish preflight, so on a branch whose version is already
+      # published it fails with "cannot publish over the previously published
+      # versions" - a red run that says nothing about the health of the pipeline.
       - name: Pack check (branch dispatch does not publish)
         if: github.ref_type != 'tag'
         run: npm pack --dry-run
