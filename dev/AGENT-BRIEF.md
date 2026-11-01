@@ -10,7 +10,7 @@
 左栏全部供应商、右栏该供应商的模型，支持拖拽排序、别名、收藏、最近、搜索、推理档位内联展开。
 
 - 仓库：https://github.com/aichixiaojuzi/dsh-model-quick-switch （public、MIT、话题 `dsh-plugin`）
-- npm：`@aichixiaojuzi/dsh-model-quick-switch`（当前 **0.1.2**，`latest`）
+- npm：`@aichixiaojuzi/dsh-model-quick-switch`（当前 **0.1.3**，`latest`）
 - 本机仓库：`C:\Users\Administrator\Documents\deepseek-harness\default-workspace\dsh-model-quick-switch`
 
 ## 架构（读这几个文件就够）
@@ -52,6 +52,17 @@ profile 目录：`C:\Users\Administrator\.dsh\profiles\desktop`。**改名时四
 
 改完**完全重启 DSH 应用**（不是刷新页面）才生效。回滚用同目录
 `*.bak-scope-<时间戳>` / `*.bak-rename-<时间戳>` 备份。
+
+## 开始一次改动（新会话照着走）
+
+1. **开场白**：新对话的第一句写
+   「读 `dev/AGENT-BRIEF.md` 和 `CHANGELOG.md`，然后我要改：〈一句话说清要改什么〉」
+   —— 不必复述项目背景，这份文件里都有。
+2. **改 + 自测**：改完 `node dev/smoke.mjs` 必须全绿；动了界面就**完全重启 DSH 应用**
+   （不是刷新页面），在输入框里实际点一遍。本机 profile 用 `link:` 指向这个仓库，
+   所以改动保存后重启即生效（见下面「本机开发安装」）。
+3. **发版**：`package.json` 版本 +1 → `CHANGELOG.md` 加一节 → 提交 → 打 tag → 推 tag
+   （`publish.yml` 自动发布，无需令牌，见下面「发布」）。
 
 ## 常用命令
 
