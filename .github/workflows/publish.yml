@@ -61,9 +61,46 @@ jobs:
       - name: Smoke test
         run: node dev/smoke.mjs
 
+      # Trusted publishing needs a token from this workflow's OIDC identity. These
+      # facts are emitted as annotations on purpose: annotations are readable by
+      # anyone (the raw job log is not), so a failed release can be diagnosed
+      # without asking the repo owner to copy the log out by hand.
+      - name: Publish environment
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          note() { echo "::notice title=$1::$2"; }
+          note "node" "$(node --version)"
+          note "npm" "$(npm --version)"
+          note "ref" "${GITHUB_REF} (${GITHUB_REF_TYPE})"
+          note "registry" "$(npm config get registry)"
+          if [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ]; then
+            note "OIDC" "ACTIONS_ID_TOKEN_REQUEST_URL is present"
+          else
+            echo "::error title=OIDC::ACTIONS_ID_TOKEN_REQUEST_URL is missing, so 'permissions: id-token: write' did not take effect"
+          fi
+          cfg="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          note "npmrc" "config file: ${cfg}"
+          if [ -f "$cfg" ]; then
+            note "npmrc authToken lines" "$(grep -c '_authToken' "$cfg" || true) (content is never printed)"
+          else
+            note "npmrc" "file does not exist"
+          fi
+
       - name: Publish to npm
         if: github.ref_type == 'tag'
-        run: npm publish
+        shell: bash
+        run: |
+          set +e
+          npm publish 2>&1 | tee publish.log
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then
+            # Re-emit the reason as annotations so it survives without the raw log.
+            grep -iE 'npm (error|ERR!|warn)' publish.log | head -n 12 | sed 's/%/%25/g' | while IFS= read -r line; do
+              echo "::error title=npm publish failed::${line}"
+            done
+            exit "$code"
+          fi
 
       # Manual dispatch from a branch: list what would be packed, without contacting
       # the registry. "npm publish --dry-run" is deliberately NOT used: it still runs
