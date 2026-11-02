@@ -90,19 +90,42 @@ node dev\smoke.mjs                                     # 自测（必须全绿�
 
 ```powershell
 # 1. 改 package.json 的 version + 补 CHANGELOG 小节（tag 会校验两者一致）
-# 2. 提交，打 tag，推送；推 tag 会触发 .github/workflows/publish.yml
+#    CHANGELOG：把「## [未发布]」改成「## [X.Y.Z] - 日期」，并在文末补一行链接引用
+# 2. 提交、打 tag、推 tag（推 tag 会触发 .github/workflows/publish.yml）
+git add -A; git commit -m "feat: ... (vX.Y.Z)"
+git tag -a vX.Y.Z -m "vX.Y.Z - ..."
 git push origin main
-git push origin v0.1.4
+git push origin vX.Y.Z
+
+# 要重发同一个版本号（tag 已在远端）时：先删远端标签，再推移动后的标签
+git tag -f -a vX.Y.Z -m "vX.Y.Z - ..."
+git push origin :refs/tags/vX.Y.Z     # 冒号开头 = 删除远端标签
+git push origin vX.Y.Z
 ```
 
 发布走 npm **Trusted Publishing（OIDC）**：仓库、GitHub secrets、本机都**没有**令牌。
-Trusted Publisher 已在 npmjs.com 配好并用一次 `workflow_dispatch` 验证通过
-（探针停在 `cannot publish over 0.1.3` 即认证成功；**E404 才是不匹配**）。
-配好之后 `workflow_dispatch` 从分支手动跑只做打包检查（不写 registry），
-从 tag 跑才真正发布。
-前提是 npmjs.com 上该包已配好 Trusted Publisher，四个字段必须与
-`publish.yml` 顶部注释完全一致（org/user、repo、workflow 文件名、environment），
-否则 npm 会用 **E404** 拒绝。信任关系改过之后**必须同步改 npm 上的配置**。
+
+⚠️ **不要用「探针停在版本冲突」来证明认证成功**。registry **先查版本冲突、后查身份**，
+那句 `cannot publish over the previously published versions` 根本没走到鉴权。
+2026-11-03 首次真发布（0.2.0）就被这个错误结论坑了一次：真实状态是
+`E404 Not Found - PUT`，因为 **npm 上的 Trusted Publisher 条目不见了**
+（改同页的 Publishing access 设置时被一并清掉）。
+唯一可信的验证只有一种：**用一个没发布过的版本号真发一次**。
+
+排查顺序（细节见 `_publish/PUBLISH-STEPS.md` 的 B5）：
+
+1. **`E404 Not Found - PUT`** → 打开 `<https://www.npmjs.com/package/<包名>/access>`
+   看 **Trusted Publisher 那块是否还列着** `publish.yml`。空表单 = 条目已丢，重建即可。
+   四个字段必须与 `publish.yml` 顶部注释一致：org/user、repo、workflow 文件名（只填
+   `publish.yml`）、environment **留空**；Allowed actions 选 `npm publish`。
+2. **日志读不到时看 check-run 注解**（公开可读，原始日志要管理员权限）：工作流会把
+   npm 的报错、OIDC 的 `job_workflow_ref` / `repository` / `ref`、`.npmrc` 令牌行状态
+   都写成注解。
+3. `setup-node` 为 `registry-url` 写的 `_authToken=${NODE_AUTH_TOKEN}` 占位行会干扰
+   OIDC 认证，工作流里已有一步把它删掉——别把这一步当成多余代码删了。
+4. **判断发布是否成功别看 `dist-tags`**：CDN 会滞后 1–2 分钟（0.2.0 时那边仍显示旧版本、
+   版本文档 404）。看 `https://registry.npmjs.org/@scope%2Fname/latest` 的 `version`，
+   或完整 packument 里的 `time`。
 
 包的 **Publishing access** 已设为「Require two-factor authentication and disallow
 bypass 2fa tokens」，所以**一次性令牌再也发不了版**——不要试图再造令牌，那条路已关闭。
