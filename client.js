@@ -38,8 +38,6 @@ window.__ModuleLoader__.load({
         effort: 'Reasoning effort',
         account: 'DeepSeek Account',
         unavailable: 'Not in catalog',
-        filterPlaceholder: 'Filter providers…',
-        filterEmpty: 'No provider matches.',
         retry: 'Retry',
         menuRename: 'Rename',
         menuDefaultOn: 'Open the panel here',
@@ -50,8 +48,17 @@ window.__ModuleLoader__.load({
         menuResetModels: 'Reset this group’s model order',
         menuFavoriteAll: 'Pin all its models',
         menuClearFavorites: 'Unpin all its models',
-        menuReload: 'Reload the model catalog',
+        menuReload: 'Refresh providers and models',
+        menuDelete: 'Delete from this panel',
+        menuDeleteHint: 'Removes the provider from this panel only — restore it from the rail. Your profile configuration is not touched.',
+        menuUnrename: 'Reset to catalog name',
+        reloadModels: 'Reload providers and models',
+        reloading: 'Reloading…',
+        hiddenRow: n => `${n} removed`,
+        hiddenAll: 'Every provider has been removed from this panel.',
+        restore: 'Restore',
         menuHint: 'Right-click for rename, order and pin actions',
+        rowHint: 'Right-click a model to rename or pin it',
         broken: 'The model switcher hit an error.',
         emptyCatalog: 'No providers are available in this session yet.',
         renamePlaceholder: 'Display name',
@@ -78,8 +85,6 @@ window.__ModuleLoader__.load({
         effort: '推理强度',
         account: 'DeepSeek 账号',
         unavailable: '不在目录中',
-        filterPlaceholder: '过滤供应商…',
-        filterEmpty: '没有匹配的供应商。',
         retry: '重试',
         menuRename: '重命名',
         menuDefaultOn: '打开面板时默认选它',
@@ -90,8 +95,17 @@ window.__ModuleLoader__.load({
         menuResetModels: '重置该组模型顺序',
         menuFavoriteAll: '全部加入收藏',
         menuClearFavorites: '清空该组收藏',
-        menuReload: '重新加载模型目录',
+        menuReload: '刷新供应商与模型',
+        menuDelete: '从面板删除',
+        menuDeleteHint: '只从这个面板移除，随时可从左栏底部恢复；不会删除 profile 里的供应商配置',
+        menuUnrename: '恢复原名',
+        reloadModels: '重新加载供应商与模型',
+        reloading: '正在重新加载…',
+        hiddenRow: n => `已删除 ${n} 个`,
+        hiddenAll: '所有供应商都已从这个面板删除。',
+        restore: '恢复',
         menuHint: '右键可重命名、排序、收藏',
+        rowHint: '右键模型可重命名或收藏',
         broken: '模型选择器出错了。',
         emptyCatalog: '这个会话暂时没有可用的供应商。',
         renamePlaceholder: '显示名称',
@@ -141,7 +155,16 @@ window.__ModuleLoader__.load({
     /* ------------------------------------------------------------ preferences */
 
     const PREFS_KEY = 'dsh.model-quick-switch.v1'
-    const EMPTY_PREFS = { providerOrder: [], modelOrder: {}, favorites: [], recent: [], aliases: {}, defaultProvider: '' }
+    const EMPTY_PREFS = {
+      providerOrder: [],
+      modelOrder: {},
+      favorites: [],
+      recent: [],
+      aliases: {},
+      modelAliases: {},
+      hiddenProviders: [],
+      defaultProvider: '',
+    }
     const prefsListeners = new Set()
     let prefsCache
 
@@ -149,12 +172,31 @@ window.__ModuleLoader__.load({
       return Array.isArray(value) ? value.filter(item => typeof item === 'string') : []
     }
 
+    /** Aliases are display-only: trimmed, capped, empty ones dropped. */
+    function readAliasMap(raw, into) {
+      if (!raw || typeof raw !== 'object') return
+      for (const key of Object.keys(raw)) {
+        const value = raw[key]
+        if (typeof value === 'string' && value.trim() !== '') into[key] = value.trim().slice(0, 40)
+      }
+    }
+
     function sanitizePrefs(raw) {
-      const next = { providerOrder: [], modelOrder: {}, favorites: [], recent: [], aliases: {}, defaultProvider: '' }
+      const next = {
+        providerOrder: [],
+        modelOrder: {},
+        favorites: [],
+        recent: [],
+        aliases: {},
+        modelAliases: {},
+        hiddenProviders: [],
+        defaultProvider: '',
+      }
       if (!raw || typeof raw !== 'object') return next
       next.providerOrder = stringArray(raw.providerOrder)
       next.favorites = stringArray(raw.favorites)
       next.recent = stringArray(raw.recent).slice(0, 12)
+      next.hiddenProviders = stringArray(raw.hiddenProviders)
       next.defaultProvider = typeof raw.defaultProvider === 'string' ? raw.defaultProvider : ''
       if (raw.modelOrder && typeof raw.modelOrder === 'object') {
         for (const key of Object.keys(raw.modelOrder)) {
@@ -162,12 +204,8 @@ window.__ModuleLoader__.load({
           if (list.length > 0) next.modelOrder[key] = list
         }
       }
-      if (raw.aliases && typeof raw.aliases === 'object') {
-        for (const key of Object.keys(raw.aliases)) {
-          const value = raw.aliases[key]
-          if (typeof value === 'string' && value.trim() !== '') next.aliases[key] = value.trim().slice(0, 40)
-        }
-      }
+      readAliasMap(raw.aliases, next.aliases)
+      readAliasMap(raw.modelAliases, next.modelAliases)
       return next
     }
 
@@ -198,6 +236,8 @@ window.__ModuleLoader__.load({
         favorites: base.favorites.slice(),
         recent: base.recent.slice(),
         aliases: Object.assign({}, base.aliases),
+        modelAliases: Object.assign({}, base.modelAliases),
+        hiddenProviders: base.hiddenProviders.slice(),
         defaultProvider: base.defaultProvider,
       }
       mutate(next)
@@ -326,6 +366,7 @@ window.__ModuleLoader__.load({
     const iconClose = () => lineIcon(['M4 4l8 8', 'M12 4l-8 8'], 12)
     const iconClock = () => lineIcon(['M8 4.2v4l2.6 1.6', 'M14 8a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z'], 12)
     const iconWarn = () => lineIcon(['M8 2.6l5.6 10.4H2.4L8 2.6Z', 'M8 6.6v3'], 12)
+    const iconReload = () => lineIcon(['M13 8a5 5 0 1 1-1.7-3.75', 'M13.1 2.4v3.1H10'], 12)
 
     function starIcon(filled) {
       return h('svg', {
@@ -386,6 +427,7 @@ window.__ModuleLoader__.load({
 .dqms-row[data-cursor="true"]{background:var(--dsw-alias-bg-layer-2)}
 .dqms-row[data-current="true"]{background:var(--dsw-alias-bg-layer-2);box-shadow:inset 2px 0 0 var(--dsw-alias-brand-primary)}
 .dqms-row[data-dragging="true"]{opacity:.45}
+.dqms-row[data-editing="true"]{background:var(--dsw-alias-bg-layer-2);cursor:default}
 .dqms-row-main{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .dqms-row-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .dqms-row-prov{flex:none;font-size:11px;padding:1px 6px;border-radius:999px;background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);border:1px solid var(--dsw-alias-border-l1)}
@@ -407,12 +449,13 @@ window.__ModuleLoader__.load({
 .dqms-link{padding:2px 6px;border:0;border-radius:6px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;cursor:pointer;flex:none}
 .dqms-link:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dqms-error{padding:6px 10px;border-top:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-state-error-primary);font-size:11px;line-height:1.5;word-break:break-word}
-.dqms-rail-filter{width:100%;margin:0 0 4px;padding:4px 8px;border-radius:7px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;outline:0}
-.dqms-rail-filter:focus{border-color:var(--dsw-alias-brand-primary)}
-.dqms-rail-empty{padding:8px;color:var(--dsw-alias-label-secondary);font-size:11px;line-height:1.5}
 .dqms-rail-dot{width:5px;height:5px;border-radius:50%;background:var(--dsw-alias-brand-primary);flex:none}
+.dqms-rail-restore{width:100%;margin-top:2px;padding:5px 8px;border:0;border-radius:8px;background:transparent;color:var(--dsw-alias-label-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer;opacity:.8}
+.dqms-rail-restore:hover{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary);opacity:1}
 .dqms-rail-editing{padding:3px 4px;cursor:default}
 .dqms-rail-input{width:100%;padding:4px 6px;border-radius:6px;border:1px solid var(--dsw-alias-brand-primary);background:var(--dsw-alias-bg-base);color:var(--dsw-alias-label-primary);font:inherit;font-size:12px;outline:0}
+.dqms-row-input{flex:1;min-width:0}
+.dqms-list-head-right{display:flex;align-items:center;gap:6px;flex:none}
 .dqms-rail-item[data-menu="true"]{background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-primary)}
 .dqms-menu{position:fixed;z-index:2147482100;display:flex;flex-direction:column;padding:4px;border-radius:10px;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);box-shadow:0 14px 38px rgba(0,0,0,.34);max-height:70vh;overflow:auto}
 .dqms-menu-item{display:flex;align-items:center;gap:8px;padding:7px 10px;border:0;border-radius:7px;background:transparent;color:var(--dsw-alias-label-primary);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;white-space:nowrap}
@@ -462,8 +505,8 @@ window.__ModuleLoader__.load({
       const [keyboard, setKeyboard] = useState(false)
       const [menu, setMenu] = useState(null)
       const [renaming, setRenaming] = useState(null)
-      const [providerFilter, setProviderFilter] = useState('')
       const [refreshTick, setRefreshTick] = useState(0)
+      const [reloading, setReloading] = useState(false)
 
       const triggerRef = useRef(null)
       const panelRef = useRef(null)
@@ -475,7 +518,17 @@ window.__ModuleLoader__.load({
       const cancelRename = useRef(false)
       const renamingRef = useRef(null)
 
-      const groups = state && Array.isArray(state.groups) ? state.groups : []
+      const rawGroups = state && Array.isArray(state.groups) ? state.groups : []
+      // A provider id is the stable identity used by selections and local
+      // preferences. Keep the first catalog record when a stale/duplicated
+      // snapshot contains the same id more than once.
+      const groups = []
+      const groupIds = new Set()
+      for (const group of rawGroups) {
+        if (!group || typeof group.id !== 'string' || groupIds.has(group.id)) continue
+        groupIds.add(group.id)
+        groups.push(group)
+      }
       const failures = state && Array.isArray(state.failures) ? state.failures : []
       const current = state && state.current ? state.current : null
       const pending = state && state.pending ? state.pending : null
@@ -493,6 +546,12 @@ window.__ModuleLoader__.load({
       }
 
       const providerOrder = orderIds(prefs.providerOrder, officialProviderOrder(groups))
+      // Removing a provider is a panel-local decision: the row leaves the rail,
+      // the search, the pinned list and the recent list, but the catalog and the
+      // profile configuration keep it. `restoreProviders` puts all of them back.
+      const hiddenProviders = prefs.hiddenProviders
+      const hiddenSet = new Set(hiddenProviders)
+      const visibleOrder = providerOrder.filter(id => !hiddenSet.has(id))
       const providerName = group => (group && group.id === 'deepseek-account' ? copy.account : (group && group.name) || '')
       // The catalog name is the fallback; a local alias only changes what this
       // browser shows and what search matches. The provider id never moves.
@@ -500,6 +559,14 @@ window.__ModuleLoader__.load({
         if (!group) return ''
         const alias = prefs.aliases[group.id]
         return typeof alias === 'string' && alias !== '' ? alias : providerName(group)
+      }
+
+      /** A model's row label: local alias first, then the catalog name. */
+      const modelLabel = (group, model) => {
+        if (!group || !model) return ''
+        const alias = prefs.modelAliases[keyOf(group.id, model.id)]
+        if (typeof alias === 'string' && alias !== '') return alias
+        return model.name || model.id
       }
 
       function modelsOf(group) {
@@ -510,16 +577,17 @@ window.__ModuleLoader__.load({
         return order.map(id => byId.get(id)).filter(Boolean)
       }
 
-      const favoriteRows = prefs.favorites.map(key => modelIndex.get(key)).filter(Boolean)
-      const recentRows = prefs.recent.map(key => modelIndex.get(key)).filter(Boolean)
+      const visible = entry => entry && !hiddenSet.has(entry.group.id)
+      const favoriteRows = prefs.favorites.map(key => modelIndex.get(key)).filter(visible)
+      const recentRows = prefs.recent.map(key => modelIndex.get(key)).filter(visible)
 
-      const knownViews = new Set(providerOrder)
+      const knownViews = new Set(visibleOrder)
       const failureIds = new Set(failures.map(entry => entry.id))
       // An explicit "open here" preference beats the selected model, so the
       // panel reliably lands on the provider the user works in.
       const preferredView = prefs.defaultProvider && knownViews.has(prefs.defaultProvider) ? prefs.defaultProvider : null
       const fallbackView = preferredView
-        || (current && knownViews.has(current.provider) ? current.provider : providerOrder[0])
+        || (current && knownViews.has(current.provider) ? current.provider : visibleOrder[0])
       const view = activeKey === 'favorites' || activeKey === 'recent'
         ? activeKey
         : knownViews.has(activeKey) || failureIds.has(activeKey)
@@ -535,10 +603,10 @@ window.__ModuleLoader__.load({
 
       if (searching) {
         headTitle = copy.results
-        for (const providerId of providerOrder) {
+        for (const providerId of visibleOrder) {
           const group = providerById.get(providerId)
           for (const model of modelsOf(group)) {
-            const haystack = `${model.name || ''} ${providerLabel(group)} ${providerId}`
+            const haystack = `${model.name || ''} ${modelLabel(group, model)} ${providerLabel(group)} ${providerId} ${model.id || ''}`
             if (looseMatch(needle, haystack)) rows.push({ group, model })
           }
         }
@@ -550,7 +618,7 @@ window.__ModuleLoader__.load({
         rows = recentRows
       } else if (view) {
         const group = providerById.get(view)
-        headTitle = group ? providerName(group) : ''
+        headTitle = group ? providerLabel(group) : ''
         rows = modelsOf(group).map(model => ({ group, model }))
       }
 
@@ -559,20 +627,16 @@ window.__ModuleLoader__.load({
         failed = failures.find(entry => entry.id === view) || null
       }
 
-      const filterNeedle = providerFilter.trim().toLowerCase()
-      const filteredProviderOrder = filterNeedle
-        ? providerOrder.filter(id => looseMatch(filterNeedle, `${providerLabel(providerById.get(id))} ${id}`))
-        : providerOrder
-      const railItems = filteredProviderOrder.map(id => ({ kind: 'provider', id, group: providerById.get(id) }))
-      for (const failure of failures) {
-        if (providerById.has(failure.id)) continue
-        if (filterNeedle && !looseMatch(filterNeedle, `${failure.name || ''} ${failure.id}`)) continue
-        railItems.push({ kind: 'failure', id: failure.id, failure })
-      }
+      // Failed providers stay in the directory state so the selected provider
+      // can show its error and retry action, but they do not become fake
+      // provider rows in the left rail. The rail represents usable providers.
+      const railItems = visibleOrder.map(id => ({ kind: 'provider', id, group: providerById.get(id) }))
 
       const currentEntry = current ? modelIndex.get(keyOf(current.provider, current.model)) : undefined
-      const triggerLabel = currentEntry ? currentEntry.model.name : copy.selectModel
-      const triggerTitle = currentEntry ? `${providerLabel(currentEntry.group)} · ${currentEntry.model.name}` : copy.selectModel
+      const triggerLabel = currentEntry ? modelLabel(currentEntry.group, currentEntry.model) : copy.selectModel
+      const triggerTitle = currentEntry
+        ? `${providerLabel(currentEntry.group)} · ${modelLabel(currentEntry.group, currentEntry.model)}`
+        : copy.selectModel
 
       /* --- geometry --- */
 
@@ -621,13 +685,15 @@ window.__ModuleLoader__.load({
       }, [open, place])
 
       useEffect(() => {
-        if (!open) return
+        if (!open) return undefined
         const timer = window.setTimeout(() => {
           if (searchRef.current) searchRef.current.focus()
+          // Opening the picker refreshes the current session's catalog so
+          // provider/model changes made in Settings are reflected immediately.
+          if (typeof props.load === 'function') {
+            try { props.load(true) } catch (error) { /* surfaced on the directory store */ }
+          }
         }, 0)
-        if (typeof props.load === 'function') {
-          try { props.load() } catch (error) { /* surfaced on the directory store */ }
-        }
         return () => { window.clearTimeout(timer) }
       }, [open, props.load])
 
@@ -719,12 +785,17 @@ window.__ModuleLoader__.load({
         })
       }, [])
 
+      // Ordering acts on what the user can see: a provider removed from the
+      // panel never occupies a slot, so index math stays honest. Removed ids
+      // simply fall back to their official rank whenever they are restored.
+      const visibleOrderOf = useCallback(next => orderIds(next.providerOrder, officialProviderOrder(groups))
+        .filter(id => !next.hiddenProviders.includes(id)), [groups])
+
       const moveProvider = useCallback((from, to) => {
         updatePrefs(next => {
-          const order = orderIds(next.providerOrder, officialProviderOrder(groups))
-          next.providerOrder = moveItem(order, from, to)
+          next.providerOrder = moveItem(visibleOrderOf(next), from, to)
         })
-      }, [groups])
+      }, [visibleOrderOf])
 
       const moveModel = useCallback((group, from, to) => {
         if (!group) return
@@ -764,31 +835,41 @@ window.__ModuleLoader__.load({
         updatePrefs(next => { next.providerOrder = []; next.modelOrder = {} })
       }, [])
 
-      /* --- provider context menu --- */
+      /* --- context menus (provider rail and model rows) --- */
 
       const closeMenu = useCallback(() => setMenu(null), [])
 
-      const openMenu = useCallback((event, id) => {
+      const openMenu = useCallback((event, target) => {
         event.preventDefault()
         event.stopPropagation()
         const width = 226
         const left = Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8))
         // Grow upward near the bottom edge so the menu never leaves the viewport.
         const flip = event.clientY > window.innerHeight / 2
-        setMenu({
-          id,
+        setMenu(Object.assign({}, target, {
           width,
           left,
           top: flip ? undefined : Math.max(8, event.clientY),
           bottom: flip ? Math.max(8, window.innerHeight - event.clientY) : undefined,
-        })
+        }))
       }, [])
+
+      const openProviderMenu = useCallback((event, id) => openMenu(event, { kind: 'provider', id }), [openMenu])
+      const openModelMenu = useCallback((event, group, model) => {
+        openMenu(event, { kind: 'model', key: keyOf(group.id, model.id), provider: group.id })
+      }, [openMenu])
 
       const startRename = useCallback(id => {
         const group = providerById.get(id)
-        setRenaming({ id, value: providerLabel(group) })
+        setRenaming({ kind: 'provider', id, value: providerLabel(group) })
         closeMenu()
       }, [providerById, prefs, closeMenu])
+
+      const startModelRename = useCallback(key => {
+        const entry = modelIndex.get(key)
+        setRenaming({ kind: 'model', key, value: entry ? modelLabel(entry.group, entry.model) : key })
+        closeMenu()
+      }, [modelIndex, prefs, closeMenu])
 
       const commitRename = useCallback(() => {
         const target = renamingRef.current
@@ -799,17 +880,51 @@ window.__ModuleLoader__.load({
           return
         }
         const value = target.value.trim()
+        const modelRename = target.kind === 'model'
         updatePrefs(next => {
+          // An alias equal to the catalog name is not an alias: drop it so the
+          // label keeps following the catalog (including language switches).
+          if (modelRename) {
+            const entry = modelIndex.get(target.key)
+            const base = entry ? (entry.model.name || entry.model.id) : ''
+            const aliases = Object.assign({}, next.modelAliases)
+            if (value === '' || value === base) delete aliases[target.key]
+            else aliases[target.key] = value
+            next.modelAliases = aliases
+            return
+          }
           const group = providerById.get(target.id)
           const base = group ? providerName(group) : ''
           const aliases = Object.assign({}, next.aliases)
-          // An alias equal to the catalog name is not an alias: drop it so the
-          // label keeps following the catalog (including language switches).
           if (value === '' || value === base) delete aliases[target.id]
           else aliases[target.id] = value
           next.aliases = aliases
         })
-      }, [providerById])
+      }, [providerById, modelIndex])
+
+      const resetModelAlias = useCallback(key => {
+        updatePrefs(next => {
+          const aliases = Object.assign({}, next.modelAliases)
+          delete aliases[key]
+          next.modelAliases = aliases
+        })
+        closeMenu()
+      }, [closeMenu])
+
+      /** Remove a provider from this panel only; see `restoreProviders`. */
+      const hideProvider = useCallback(id => {
+        updatePrefs(next => {
+          if (!next.hiddenProviders.includes(id)) next.hiddenProviders = next.hiddenProviders.concat(id)
+          // A default-opens-here pointer to a hidden provider would be dead.
+          if (next.defaultProvider === id) next.defaultProvider = ''
+        })
+        closeMenu()
+      }, [closeMenu])
+
+      const restoreProviders = useCallback(() => {
+        updatePrefs(next => { next.hiddenProviders = [] })
+        closeMenu()
+      }, [closeMenu])
 
       const toggleDefaultProvider = useCallback(id => {
         updatePrefs(next => { next.defaultProvider = next.defaultProvider === id ? '' : id })
@@ -818,17 +933,17 @@ window.__ModuleLoader__.load({
 
       const pinProvider = useCallback(id => {
         updatePrefs(next => {
-          const order = orderIds(next.providerOrder, officialProviderOrder(groups))
+          const order = visibleOrderOf(next)
           const from = order.indexOf(id)
           if (from < 0) return
           next.providerOrder = moveItem(order, from, 0)
         })
         closeMenu()
-      }, [groups, closeMenu])
+      }, [visibleOrderOf, closeMenu])
 
       const shiftProvider = useCallback((id, delta) => {
         updatePrefs(next => {
-          const order = orderIds(next.providerOrder, officialProviderOrder(groups))
+          const order = visibleOrderOf(next)
           const from = order.indexOf(id)
           const to = from + delta
           if (from < 0 || to < 0 || to >= order.length) return
@@ -859,11 +974,23 @@ window.__ModuleLoader__.load({
 
       const reloadCatalog = useCallback(() => {
         closeMenu()
+        setReloading(true)
+        // Force the current session's directory to resolve from the latest
+        // configured providers before loading its model catalog.
+        let pendingLoad = null
         if (typeof props.load === 'function') {
-          try { props.load(true) } catch (error) { /* the directory store carries the failure */ }
+          try { pendingLoad = props.load(true) } catch (error) { pendingLoad = null }
         }
+        if (resolveDirectory) {
+          let next = null
+          try { next = resolveDirectory() } catch (error) { next = null }
+          if (next) setDirectory(next)
+        }
+        const settle = () => setReloading(false)
+        if (pendingLoad && typeof pendingLoad.then === 'function') pendingLoad.then(settle, settle)
+        else window.setTimeout(settle, 500)
         setRefreshTick(value => value + 1)
-      }, [props, closeMenu])
+      }, [props, closeMenu, resolveDirectory])
 
       // The catalog cannot always be loaded the first time: a session that was
       // just created, or one the host has not retained yet, rejects the load.
@@ -973,7 +1100,7 @@ window.__ModuleLoader__.load({
               placeholder: copy.renamePlaceholder,
               'aria-label': copy.menuRename,
               title: copy.renameHint,
-              onChange: event => setRenaming({ id: item.id, value: event.target.value }),
+              onChange: event => setRenaming({ kind: 'provider', id: item.id, value: event.target.value }),
               onKeyDown: event => {
                 if (event.key === 'Enter') {
                   event.preventDefault()
@@ -997,10 +1124,10 @@ window.__ModuleLoader__.load({
           role: 'tab',
           className: 'dqms-rail-item',
           'data-active': view === item.id ? 'true' : 'false',
-          'data-menu': menu && menu.id === item.id ? 'true' : 'false',
+          'data-menu': menu && menu.kind === 'provider' && menu.id === item.id ? 'true' : 'false',
           'aria-selected': view === item.id ? 'true' : 'false',
           title: copy.menuHint,
-          draggable: !searching && filterNeedle === '',
+          draggable: !searching,
           onDragStart: event => {
             railDrag.current = item.id
             try {
@@ -1011,14 +1138,14 @@ window.__ModuleLoader__.load({
           onDragOver: event => {
             const source = railDrag.current
             if (!source || source === item.id) return
-            const from = providerOrder.indexOf(source)
-            const to = providerOrder.indexOf(item.id)
+            const from = visibleOrder.indexOf(source)
+            const to = visibleOrder.indexOf(item.id)
             if (from < 0 || to < 0 || from === to) return
             event.preventDefault()
             moveProvider(from, to)
           },
           onDragEnd: () => { railDrag.current = null },
-          onContextMenu: event => openMenu(event, item.id),
+          onContextMenu: event => openProviderMenu(event, item.id),
           onClick: () => { setActiveKey(item.id); setQuery(''); closeMenu() },
         },
           h('span', { className: 'dqms-rail-name' }, providerLabel(group)),
@@ -1026,6 +1153,18 @@ window.__ModuleLoader__.load({
           h('span', { className: 'dqms-rail-count' }, copy.count(count)),
         )
       })
+
+      // Removing a provider stays reversible: the rail carries the way back,
+      // and it only appears once something has actually been removed.
+      const restoreRow = hiddenProviders.length > 0
+        ? h('button', {
+          key: 'rail-restore',
+          type: 'button',
+          className: 'dqms-rail-restore',
+          title: copy.menuDeleteHint,
+          onClick: restoreProviders,
+        }, `${copy.hiddenRow(hiddenProviders.length)} · ${copy.restore}`)
+        : null
 
       const renderRow = (row, index) => {
         const group = row.group
@@ -1037,14 +1176,18 @@ window.__ModuleLoader__.load({
         const efforts = model.reasoning && Array.isArray(model.reasoning.efforts) ? model.reasoning.efforts : []
         const showEfforts = isCurrent && efforts.length > 1 && !searching
         const badgeText = badgeLabel(model, props.resolveText)
+        // A row can be renaming in place: the click and drag affordances step
+        // aside so typing never picks the model or starts a reorder.
+        const editing = renaming !== null && renaming.kind === 'model' && renaming.key === key
         return h('div', {
           key: key + '@' + group.id,
           className: 'dqms-row',
           role: 'option',
           'data-current': isCurrent ? 'true' : 'false',
           'data-cursor': keyboard && index === cursor ? 'true' : 'false',
+          'data-editing': editing ? 'true' : 'false',
           'aria-selected': isCurrent ? 'true' : 'false',
-          draggable: !searching && view !== 'recent',
+          draggable: !searching && view !== 'recent' && !editing,
           onDragStart: event => {
             rowDrag.current = index
             try {
@@ -1063,11 +1206,38 @@ window.__ModuleLoader__.load({
             rowDrag.current = -1
             delete event.currentTarget.dataset.dragging
           },
+          onContextMenu: event => openModelMenu(event, group, model),
           onMouseEnter: () => { if (keyboard) setCursor(index) },
-          onClick: () => { if (!isCurrent) pick(row) },
+          onClick: () => { if (!isCurrent && !editing) pick(row) },
         },
           h('div', { className: 'dqms-row-main' },
-            h('span', { className: 'dqms-row-name' }, model.name || model.id),
+            editing
+              ? h('input', {
+                className: 'dqms-rail-input dqms-row-input',
+                value: renaming.value,
+                autoFocus: true,
+                spellCheck: false,
+                placeholder: copy.renamePlaceholder,
+                'aria-label': copy.menuRename,
+                title: copy.renameHint,
+                onClick: event => event.stopPropagation(),
+                onChange: event => setRenaming({ kind: 'model', key, value: event.target.value }),
+                onKeyDown: event => {
+                  if (event.key === 'Enter') {
+                    event.preventDefault()
+                    commitRename()
+                    return
+                  }
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    cancelRename.current = true
+                    setRenaming(null)
+                  }
+                },
+                onBlur: () => commitRename(),
+              })
+              : h('span', { className: 'dqms-row-name', title: copy.rowHint }, modelLabel(group, model)),
             badgeText ? h('span', { className: 'dqms-badge' }, badgeText) : null,
             searching ? h('span', { className: 'dqms-row-prov' }, providerLabel(group)) : null,
             isCurrent && !isPending ? h('span', { className: 'dqms-row-check' }, iconCheck()) : null,
@@ -1117,6 +1287,12 @@ window.__ModuleLoader__.load({
           body = h('div', { className: 'dqms-empty' }, copy.emptyFavorites)
         } else if (view === 'recent') {
           body = h('div', { className: 'dqms-empty' }, copy.emptyRecent)
+        } else if (groups.length > 0 && visibleOrder.length === 0) {
+          // Every provider was removed from the panel; the way back is here.
+          body = h('div', { className: 'dqms-empty dqms-empty-catalog' },
+            h('span', null, copy.hiddenAll),
+            h('button', { type: 'button', className: 'dqms-link', onClick: restoreProviders }, copy.restore),
+          )
         } else if (groups.length === 0) {
           body = h('div', { className: 'dqms-empty dqms-empty-catalog' },
             h('span', null, status === 'loading' || status === 'idle' ? copy.loading : copy.emptyCatalog),
@@ -1128,18 +1304,25 @@ window.__ModuleLoader__.load({
         }
       }
 
-      const menuGroup = menu ? providerById.get(menu.id) : undefined
-      const menuIndex = menu ? providerOrder.indexOf(menu.id) : -1
+      const providerMenu = menu && menu.kind !== 'model' ? menu : null
+      const menuGroup = providerMenu ? providerById.get(providerMenu.id) : undefined
+      const menuIndex = providerMenu ? visibleOrder.indexOf(providerMenu.id) : -1
       const menuKeys = menuGroup && Array.isArray(menuGroup.models) ? menuGroup.models.map(model => keyOf(menuGroup.id, model.id)) : []
       const allPinned = menuKeys.length > 0 && menuKeys.every(key => prefs.favorites.includes(key))
       const somePinned = menuKeys.some(key => prefs.favorites.includes(key))
-      const isDefaultProvider = menu !== null && prefs.defaultProvider === menu.id
+      const isDefaultProvider = providerMenu !== null && prefs.defaultProvider === providerMenu.id
+
+      const modelMenu = menu && menu.kind === 'model' ? menu : null
+      const modelMenuEntry = modelMenu ? modelIndex.get(modelMenu.key) : undefined
+      const modelMenuAliased = modelMenu ? Boolean(prefs.modelAliases[modelMenu.key]) : false
+      const modelMenuPinned = modelMenu ? prefs.favorites.includes(modelMenu.key) : false
 
       const menuItem = (id, label, action, options) => h('button', {
         key: 'mi-' + id,
         type: 'button',
         role: 'menuitem',
         className: 'dqms-menu-item',
+        title: options && options.title ? options.title : undefined,
         'data-checked': options && options.checked ? 'true' : 'false',
         'data-danger': options && options.danger ? 'true' : 'false',
         disabled: Boolean(options && options.disabled),
@@ -1160,23 +1343,40 @@ window.__ModuleLoader__.load({
         onClick: event => event.stopPropagation(),
         onContextMenu: event => event.preventDefault(),
       },
-        menuItem('rename', copy.menuRename, () => startRename(menu.id)),
-        menuItem('default', isDefaultProvider ? copy.menuDefaultOff : copy.menuDefaultOn,
-          () => toggleDefaultProvider(menu.id), { checked: isDefaultProvider }),
-        h('div', { className: 'dqms-menu-sep', key: 'menu-sep-1' }),
-        menuItem('pin', copy.menuPin, () => pinProvider(menu.id), { disabled: menuIndex <= 0 }),
-        menuItem('up', copy.menuUp, () => shiftProvider(menu.id, -1), { disabled: menuIndex <= 0 }),
-        menuItem('down', copy.menuDown, () => shiftProvider(menu.id, 1),
-          { disabled: menuIndex < 0 || menuIndex >= providerOrder.length - 1 }),
-        h('div', { className: 'dqms-menu-sep', key: 'menu-sep-2' }),
-        menuItem('reset-models', copy.menuResetModels, () => resetProviderModels(menu.id),
-          { disabled: !prefs.modelOrder[menu.id] }),
-        menuItem('pin-all', copy.menuFavoriteAll, () => favoriteProvider(menu.id, true),
-          { disabled: allPinned || menuKeys.length === 0 }),
-        menuItem('unpin-all', copy.menuClearFavorites, () => favoriteProvider(menu.id, false),
-          { disabled: !somePinned, danger: true }),
-        h('div', { className: 'dqms-menu-sep', key: 'menu-sep-3' }),
-        menuItem('reload', copy.menuReload, reloadCatalog),
+        modelMenu
+          ? [
+            menuItem('rename-model', copy.menuRename, () => startModelRename(modelMenu.key)),
+            menuItem('unrename-model', copy.menuUnrename, () => resetModelAlias(modelMenu.key),
+              { disabled: !modelMenuAliased }),
+            h('div', { className: 'dqms-menu-sep', key: 'menu-sep-model' }),
+            menuItem('pin-model', modelMenuPinned ? copy.unstar : copy.star, () => {
+              if (!modelMenuEntry) return
+              toggleFavorite(modelMenuEntry.group.id, modelMenuEntry.model.id)
+              closeMenu()
+            }, { checked: modelMenuPinned }),
+          ]
+          : [
+            menuItem('rename', copy.menuRename, () => startRename(menu.id)),
+            menuItem('default', isDefaultProvider ? copy.menuDefaultOff : copy.menuDefaultOn,
+              () => toggleDefaultProvider(menu.id), { checked: isDefaultProvider }),
+            h('div', { className: 'dqms-menu-sep', key: 'menu-sep-1' }),
+            menuItem('pin', copy.menuPin, () => pinProvider(menu.id), { disabled: menuIndex <= 0 }),
+            menuItem('up', copy.menuUp, () => shiftProvider(menu.id, -1), { disabled: menuIndex <= 0 }),
+            menuItem('down', copy.menuDown, () => shiftProvider(menu.id, 1),
+              { disabled: menuIndex < 0 || menuIndex >= visibleOrder.length - 1 }),
+            h('div', { className: 'dqms-menu-sep', key: 'menu-sep-2' }),
+            menuItem('reset-models', copy.menuResetModels, () => resetProviderModels(menu.id),
+              { disabled: !prefs.modelOrder[menu.id] }),
+            menuItem('pin-all', copy.menuFavoriteAll, () => favoriteProvider(menu.id, true),
+              { disabled: allPinned || menuKeys.length === 0 }),
+            menuItem('unpin-all', copy.menuClearFavorites, () => favoriteProvider(menu.id, false),
+              { disabled: !somePinned, danger: true }),
+            h('div', { className: 'dqms-menu-sep', key: 'menu-sep-3' }),
+            menuItem('reload', copy.menuReload, reloadCatalog),
+            h('div', { className: 'dqms-menu-sep', key: 'menu-sep-4' }),
+            menuItem('delete', copy.menuDelete, () => hideProvider(menu.id),
+              { danger: true, title: copy.menuDeleteHint }),
+          ],
       ) : null
 
       return h(React.Fragment, null,
@@ -1234,28 +1434,18 @@ window.__ModuleLoader__.load({
           ),
           h('div', { className: 'dqms-body' },
             h('div', { className: 'dqms-rail', role: 'tablist', 'aria-orientation': 'vertical' },
-              providerOrder.length > 8
-                ? h('input', {
-                  className: 'dqms-rail-filter',
-                  value: providerFilter,
-                  spellCheck: false,
-                  placeholder: copy.filterPlaceholder,
-                  'aria-label': copy.filterPlaceholder,
-                  onChange: event => setProviderFilter(event.target.value),
-                })
-                : null,
-              railRow('favorites', copy.favorites, prefs.favorites.length, starIcon(false)),
-              railRow('recent', copy.recent, prefs.recent.length, iconClock()),
+              railRow('favorites', copy.favorites, favoriteRows.length, starIcon(false)),
+              railRow('recent', copy.recent, recentRows.length, iconClock()),
               h('div', { className: 'dqms-rail-sep', key: 'rail-sep' }),
               providerRail,
-              filterNeedle !== '' && railItems.length === 0
-                ? h('div', { className: 'dqms-rail-empty', key: 'rail-empty' }, copy.filterEmpty)
-                : null,
+              restoreRow,
             ),
             h('div', { className: 'dqms-list-wrap' },
               h('div', { className: 'dqms-list-head' },
                 h('span', { className: 'dqms-list-title' }, headTitle),
-                h('span', { className: 'dqms-list-count' }, copy.count(rows.length)),
+                h('span', { className: 'dqms-list-head-right' },
+                  h('span', { className: 'dqms-list-count' }, copy.count(rows.length)),
+                ),
               ),
               h('div', {
                 ref: listRef,
@@ -1377,19 +1567,22 @@ window.__ModuleLoader__.load({
                 lookupError: () => lookupError,
                 load: force => {
                   const directory = directoryFor(sessionId, force === true)
-                  if (!directory) return
+                  if (!directory) return undefined
                   // Tolerate both shapes: the directory loading itself, or its
                   // snapshot store doing the load.
                   const run = typeof directory.load === 'function'
-                    ? () => directory.load()
+                    ? () => directory.load(force === true)
                     : directory.store && typeof directory.store.load === 'function'
-                      ? () => directory.store.load()
+                      ? () => directory.store.load(force === true)
                       : null
-                  if (!run) return
+                  if (!run) return undefined
                   try {
+                    // Returning the promise lets the reload button show progress
+                    // instead of spinning for a fixed guess.
                     const result = run()
                     if (result && typeof result.catch === 'function') result.catch(() => {})
-                  } catch (error) { /* store carries it */ }
+                    return result
+                  } catch (error) { return undefined /* store carries it */ }
                 },
                 resolveText: text => {
                   if (typeof text === 'string') return text

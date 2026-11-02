@@ -7,7 +7,8 @@
 
 `@aichixiaojuzi/dsh-model-quick-switch` —— DSH（DeepSeek Harness）的 profile bundle 插件，
 占用输入框的 `conversation.input.model` 座位，把官方的模型下拉换成「供应商优先」的双栏面板：
-左栏全部供应商、右栏该供应商的模型，支持拖拽排序、别名、收藏、最近、搜索、推理档位内联展开。
+左栏全部供应商、右栏该供应商的模型，支持拖拽排序、供应商/模型别名、收藏、最近、搜索、
+推理档位内联展开、「从面板删除」某个供应商，以及一个强制重新解析目录的 ↻ 按钮。
 
 - 仓库：https://github.com/aichixiaojuzi/dsh-model-quick-switch （public、MIT、话题 `dsh-plugin`）
 - npm：`@aichixiaojuzi/dsh-model-quick-switch`（当前 **0.1.3**，`latest`）
@@ -20,7 +21,7 @@
 | `package.json` | 包名/版本/`files` 白名单；`dsh.bundle.patch` → `cordis.patch.yml`；`dsh.client` 声明 `platform: web`、`immediately: true`、要注入的服务列表 |
 | `cordis.patch.yml` | 4 行：往 profile 插件树 `insert` 一行，`id: model-quick-switch`、`name:` **完整包名**（含作用域） |
 | `index.js` | 宿主半片，**故意为空**（`export function apply() {}`）。功能全在浏览器侧，宿主不注册任何东西 |
-| `client.js` | 全部功能（约 1400 行、单文件、**无构建步骤**）：占座、渲染、拖拽排序、别名、收藏、最近、搜索、推理档位 |
+| `client.js` | 全部功能（约 1600 行、单文件、**无构建步骤**）：占座、渲染、拖拽排序、别名（供应商 + 模型）、收藏、最近、搜索、推理档位、右键菜单、重新加载 |
 | `dev/smoke.mjs` | 无头渲染测试（stub 掉 React hooks、模块加载器、目录服务）：`node dev/smoke.mjs` |
 | `locale/{zh,en}.json` | 文案 |
 
@@ -39,6 +40,15 @@
    保留 `SeatBoundary` 兜底、子代理会话不渲染、重试/自愈循环（`SeatBoundary`、`refreshTick`）。
 5. 偏好存在 localStorage 的 `dsh.model-quick-switch.v1`（卸载/清库即恢复默认）。
 6. 禁用这个 bundle 就能恢复到官方模型选择器（profile 的 `dsh.profile.bundles` 里去掉即可）。
+7. **「删除供应商」只能做到"面板本地"**。这个插件是纯客户端半片，官方没有给客户端
+   任何删改供应商配置的通道（`llm` 只有 `listConfigurableProviders` 这类只读注册表，
+   `configEditor` 也没有 `@Remote`）。所以菜单里叫「从面板删除」：写
+   `prefs.hiddenProviders`，让它在左栏、搜索、收藏、最近里都不出现，左栏底部留
+   「已删除 N 个 · 恢复」。**不要**为了"真删除"去改 profile 配置——那是另一套风险。
+8. 模型别名的键是 `供应商id/模型id`（`prefs.modelAliases`），和供应商别名
+   （`prefs.aliases`，键是供应商 id）**分开存**；别名都要参与搜索。
+   供应商排序一律在「可见」（未删除）列表上算索引，否则删掉的供应商会占位错位。
+9. 模型目录每次打开面板都按当前会话强制重新解析，供应商右键菜单中的“刷新供应商与模型”走同一强制路径；只更新该会话的供应商/模型目录，不清理本地别名、排序、收藏或隐藏状态。渲染层按供应商 id 去重，保留目录第一次出现的记录，不合并不同 id 的同名供应商；加载失败的供应商保留在错误状态中，但不作为左栏供应商行显示。
 
 ## 本机开发安装（`link:` 方式）
 

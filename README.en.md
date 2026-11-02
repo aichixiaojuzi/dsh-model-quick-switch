@@ -57,6 +57,12 @@ panel's trigger.
 - **Pins** — the star on any model row keeps it at the top under **Pinned**.
 - **Recents** — the last 12 successful switches, recorded automatically.
 - **Search** — fuzzy match on model name, provider name and your aliases, across providers.
+- **Model context menu** — right-click any model to rename it (a local alias that also
+  participates in search) or pin it.
+- **Reload** — the ↻ button in the list header re-resolves and reloads the providers
+  and models **you already configured**, so a new key or provider needs no app restart.
+- **Drop providers you do not use** — right-click → **Delete from this panel** removes it
+  from the panel only, and it can be restored at any time.
 - **Reasoning effort** — the selected model exposes the levels its adapter declares;
   click one to switch.
 - **Model badges** — catalog tags (for example `new`) render next to the model name.
@@ -79,18 +85,30 @@ Right-click any provider in the left rail (real providers only, not Pins/Recents
 | Reset this group's model order | Clears the model order of that provider only. |
 | Pin all / Clear this group's pins | Bulk add or remove that provider's models from **Pinned**. |
 | Reload model catalog | Pick up new models or keys without reloading the page. |
+| Delete from this panel | Removes the provider from the rail, search, pins and recents. **Panel-local only** — your profile configuration is untouched, and a `N removed · Restore` row stays at the bottom of the rail. |
+
+## Model context menu
+
+Right-click any model in the right pane:
+
+| Item | Effect |
+|---|---|
+| Rename | Edit a **local display name** in place: `Enter` saves, `Esc` cancels, empty restores the original. Aliases participate in search but never change the model id. |
+| Reset to catalog name | Only meaningful once an alias exists; it clears it. |
+| Pin / Unpin | Same as the star on the row. |
 
 ## Data and boundaries
 
 - Selection goes through the shipped `ctx.modelDirectories` service (the same
   `session.selectModel`), so the `/model` popup and this panel can never disagree;
   a Host rejection is shown in red at the bottom of the panel.
-- Order, aliases, the default provider, pins and recents live in **browser
-  localStorage** under `dsh.model-quick-switch.v1`. The plugin writes no profile
-  configuration, adds no Host route and registers no locale namespace.
+- Order, aliases (one set for providers, one for models), the default provider, pins,
+  recents and deleted providers live in **browser localStorage** under
+  `dsh.model-quick-switch.v1`. The plugin writes no profile configuration, adds no Host
+  route and registers no locale namespace.
 - It replaces exactly one visual seat: `conversation.input.model`.
-- With more than 8 providers a filter box appears above the rail (it stays hidden
-  below that to save space).
+- **Delete from this panel** is panel-local: it hides the provider in this panel only.
+  The provider configuration in your profile stays exactly as it is.
 - No network access, no telemetry, no credential access. It only reads the model
   catalog the Host already publishes.
 
@@ -102,8 +120,8 @@ To drop its data too, delete the `dsh.model-quick-switch.v1` localStorage entry.
 ## Development
 
 ```powershell
-# render / behaviour smoke test (34 assertions: context menu, aliases, default
-# provider, filter, badges, empty-catalog fallbacks)
+# render / behaviour smoke test (53 assertions: both context menus, aliases,
+# delete + restore, reload button, default provider, badges, empty-catalog fallbacks)
 node dev/smoke.mjs
 
 # syntax checks
@@ -120,9 +138,11 @@ picks up your edits.
   Pinned when the model comes back.
 - The trigger keeps showing the model name on narrow widths (truncated) rather than
   collapsing to an icon.
-- Rename is display-only; catalog names come from the Host and are never rewritten.
+- Rename is display-only, for providers and models alike; catalog names come from the
+  Host and are never rewritten.
 - The model catalog is cached by the Host, so models added after the page loaded only
-  appear once the Host refreshes.
+  appear once the Host refreshes; the ↻ button forces a re-resolve, but a provider the
+  Host itself rejects still surfaces as an error.
 
 ## License
 

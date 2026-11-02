@@ -135,6 +135,11 @@ function state() {
         ],
       },
       {
+        id: 'openrouter',
+        name: 'OpenRouter (duplicate snapshot)',
+        models: [{ id: 'duplicate-model', name: 'duplicate-model' }],
+      },
+      {
         id: 'deepseek-account',
         name: 'DeepSeek Account',
         models: [{ id: 'chat-pro', name: 'chat-pro', reasoning }],
@@ -148,13 +153,16 @@ function state() {
 }
 
 let selectCalls = []
+let loadCalls = 0
+const directoryLoadArgs = []
+const propLoadArgs = []
 function makeDirectory() {
   return {
     store: {
       getSnapshot: () => state(),
       subscribe: () => () => {},
     },
-    load: () => Promise.resolve(state()),
+    load: force => { loadCalls += 1; directoryLoadArgs.push(force); return Promise.resolve(state()) },
     select: selection => { selectCalls.push(selection); return Promise.resolve({ ok: true, value: undefined }) },
   }
 }
@@ -188,7 +196,7 @@ function runScenario(name, seed, extra) {
     available: true,
     copy: extra.copy,
     directory: directory.store,
-    load: () => directory.load(),
+    load: force => { propLoadArgs.push(force); return directory.load(force) },
     select: selection => directory.select(selection),
   })
   stateCursor = 0
@@ -481,14 +489,17 @@ function mountWith(reg, seed) {
   return { tree, directory }
 }
 
-// Hook slots: 9 = context menu, 10 = inline rename, 11 = provider filter.
+// Hook slots: 9 = context menu, 10 = inline rename, 11 = reload tick,
+// 12 = reload-in-flight flag.
 resetPrefs()
 const menuTree = mountWith(freshRegistration(), Object.assign({ 2: true }, base, {
-  9: { id: 'deepseek', left: 120, top: 200, width: 226 },
+  9: { kind: 'provider', id: 'deepseek', left: 120, top: 200, width: 226 },
 })).tree
 const menuItems = findAll(menuTree, node => node.props && node.props.className === 'dqms-menu-item')
-check('context menu item count', menuItems.length, 9)
+check('context menu item count', menuItems.length, 10)
 check('context menu starts with rename', textOf(menuItems[0]).includes('重命名'), true)
+check('context menu has provider refresh', menuItems.some(item => textOf(item).includes('刷新供应商与模型')), true)
+check('context menu ends with delete', textOf(menuItems[menuItems.length - 1]).includes('从面板删除'), true)
 
 const renameTree = mountWith(freshRegistration(), Object.assign({ 2: true }, base, {
   10: { id: 'deepseek', value: '主号' },
@@ -509,10 +520,87 @@ check('default provider opens its own pane', textOf(defaultTree).includes('gemin
 check('default provider is marked once', findAll(defaultTree, node => node.props && node.props.className === 'dqms-rail-dot').length, 1)
 
 resetPrefs()
-const filterTree = mountWith(freshRegistration(), Object.assign({ 2: true, 11: 'open' }, base)).tree
-const railNames = findAll(filterTree, node => node.props && node.props.className === 'dqms-rail-name')
+// No provider filter input any more: the rail starts straight with the pinned
+// and recent views, whatever the provider count is.
+const railNames = findAll(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree,
+  node => node.props && node.props.className === 'dqms-rail-name')
   .map(node => textOf(node).replace('dqms-rail-name | ', ''))
-check('provider filter narrows the rail', railNames, ['收藏', '最近', 'OpenRouter'])
+check('rail lists usable providers, no filter box', railNames,
+  ['收藏', '最近', 'DeepSeek 账号', 'DeepSeek', 'OpenRouter'])
+check('failed providers stay out of the rail', railNames.includes('Broken Vendor'), false)
+check('duplicate provider id is removed', textOf(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree)
+  .includes('duplicate-model'), false)
+const railFilters = findAll(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree,
+  node => node.props && node.props.className === 'dqms-rail-filter')
+check('provider filter box is gone', railFilters.length, 0)
+
+/* --- model rename (right-click a row) ------------------------------------ */
+
+resetPrefs()
+const modelMenuTree = mountWith(freshRegistration(), Object.assign({ 2: true }, base, {
+  9: { kind: 'model', key: 'deepseek/deepseek-v4-pro', provider: 'deepseek', left: 300, top: 200, width: 226 },
+})).tree
+const modelMenuItems = findAll(modelMenuTree, node => node.props && node.props.className === 'dqms-menu-item')
+check('model menu item count', modelMenuItems.length, 3)
+check('model menu starts with rename', textOf(modelMenuItems[0]).includes('重命名'), true)
+check('model menu offers the alias reset', textOf(modelMenuItems[1]).includes('恢复原名'), true)
+
+const modelRenameTree = mountWith(freshRegistration(), Object.assign({ 2: true }, base, {
+  10: { kind: 'model', key: 'deepseek/deepseek-v4-pro', value: '代码模型' },
+})).tree
+const modelRenameInput = findAll(modelRenameTree, node => node.props && node.props.className === 'dqms-rail-input dqms-row-input')
+check('model rename input rendered', modelRenameInput.length, 1)
+check('model rename keeps the typed value', modelRenameInput[0].props.value, '代码模型')
+
+resetPrefs({ modelAliases: { 'deepseek/deepseek-v4-pro': '代码模型' } })
+check('model alias replaces the row label',
+  textOf(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree).includes('代码模型'), true)
+check('model alias participates in search',
+  textOf(mountWith(freshRegistration(), Object.assign({ 2: true, 3: '代码' }, base)).tree).includes('代码模型'), true)
+
+/* --- delete a provider from the panel, then restore it -------------------- */
+
+resetPrefs()
+const deleteItems = findAll(mountWith(freshRegistration(), Object.assign({ 2: true }, base, {
+  9: { kind: 'provider', id: 'deepseek', left: 120, top: 200, width: 226 },
+})).tree, node => node.props && node.props.className === 'dqms-menu-item')
+const deleteItem = deleteItems.find(node => textOf(node).includes('从面板删除'))
+deleteItem.props.onClick({ stopPropagation() {} })
+check('delete writes the hidden list', JSON.parse(localStorageStub.getItem(PREFS_STORAGE)).hiddenProviders, ['deepseek'])
+
+const hiddenTree = mountWith(freshRegistration(), Object.assign({ 2: true, 4: 'favorites' }, base)).tree
+const hiddenNames = findAll(hiddenTree, node => node.props && node.props.className === 'dqms-rail-name')
+  .map(node => textOf(node).replace('dqms-rail-name | ', ''))
+check('deleted provider leaves usable providers in the rail', hiddenNames,
+  ['收藏', '最近', 'DeepSeek 账号', 'OpenRouter'])
+check('deleted provider leaves the pinned list', textOf(hiddenTree).includes('deepseek-v4-pro'), false)
+check('deleted provider keeps a restore row',
+  findAll(hiddenTree, node => node.props && node.props.className === 'dqms-rail-restore').length, 1)
+check('restore row counts what was removed', textOf(hiddenTree).includes('已删除 1 个'), true)
+
+const restoreButtons = findAll(hiddenTree, node => node.props && node.props.className === 'dqms-rail-restore')
+restoreButtons[0].props.onClick()
+check('restore clears the hidden list', JSON.parse(localStorageStub.getItem(PREFS_STORAGE)).hiddenProviders, [])
+
+resetPrefs({ hiddenProviders: ['deepseek', 'openrouter', 'deepseek-account'] })
+check('everything removed explains itself',
+  textOf(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree).includes('所有供应商都已从这个面板删除'), true)
+check('everything removed still offers the way back',
+  textOf(mountWith(freshRegistration(), Object.assign({ 2: true }, base)).tree).includes('恢复'), true)
+
+/* --- provider-menu refresh ------------------------------------------------ */
+
+resetPrefs()
+loadCalls = 0
+const providerRefreshMount = mountWith(freshRegistration(), Object.assign({ 2: true, 9: {
+  kind: 'provider', id: 'deepseek', left: 120, top: 200, width: 226,
+} }, base))
+const providerRefreshItems = findAll(providerRefreshMount.tree,
+  node => node.props && node.props.className === 'dqms-menu-item')
+const providerRefreshItem = providerRefreshItems.find(item => textOf(item).includes('刷新供应商与模型'))
+check('provider menu refreshes the catalog', Boolean(providerRefreshItem), true)
+providerRefreshItem.props.onClick({ stopPropagation() {} })
+check('provider menu refresh forces current-session sync', directoryLoadArgs[directoryLoadArgs.length - 1], true)
 
 const failTree = mountWith(freshRegistration(), Object.assign({ 2: true, 4: 'broken-vendor' }, base)).tree
 check('failed provider offers a retry', textOf(failTree).includes('重试'), true)
