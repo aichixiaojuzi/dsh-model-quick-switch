@@ -87,6 +87,47 @@ jobs:
             note "npmrc" "file does not exist"
           fi
 
+      # Show the identity npm will validate: a wrong repository, workflow filename or
+      # ref is rejected as a bare E404, which tells us nothing. The claims are public
+      # metadata about this run, never a credential.
+      - name: Inspect the OIDC identity
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          json=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm:registry.npmjs.org")
+          tok=$(printf '%s' "$json" | sed -n 's/.*"value":"\([^"]*\)".*/\1/p')
+          if [ -z "$tok" ]; then
+            echo "::error title=OIDC::the token endpoint returned no value"
+            exit 0
+          fi
+          printf '%s' "$tok" | node -e '
+            let s = ""
+            process.stdin.on("data", d => { s += d }).on("end", () => {
+              const claims = JSON.parse(Buffer.from(s.trim().split(".")[1], "base64url").toString())
+              for (const k of ["sub", "repository", "repository_owner", "job_workflow_ref", "ref", "event_name", "environment"]) {
+                console.log(`::notice title=claim ${k}::${claims[k] ?? "(absent)"}`)
+              }
+            })'
+
+      # setup-node writes `_authToken=${NODE_AUTH_TOKEN}` for registry-url. With no
+      # token configured that placeholder can make npm authenticate with an empty
+      # credential instead of doing the OIDC exchange, which the registry answers with
+      # the same E404 as a publisher mismatch. Drop the line, keep the registry.
+      - name: Remove the token placeholder so npm publishes through OIDC
+        if: github.ref_type == 'tag'
+        shell: bash
+        run: |
+          cfg="${NPM_CONFIG_USERCONFIG:-$HOME/.npmrc}"
+          if [ -f "$cfg" ] && grep -q '_authToken' "$cfg"; then
+            grep -v '_authToken' "$cfg" > "$cfg.tmp"
+            mv "$cfg.tmp" "$cfg"
+            echo "::notice title=npmrc::removed the _authToken placeholder line"
+          else
+            echo "::notice title=npmrc::no _authToken line to remove"
+          fi
+          echo "::notice title=registry now::$(npm config get registry)"
+
       - name: Publish to npm
         if: github.ref_type == 'tag'
         shell: bash
