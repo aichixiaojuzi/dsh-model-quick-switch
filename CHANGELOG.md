@@ -2,6 +2,20 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [0.2.1] - 2026-11-05
+
+### 修复
+
+- **工作区 / 新会话切换时的模型选择器生命周期**：移除插件按会话 ID 保存的第二份目录缓存，交由官方按 retained binding 管理的解析器返回当前目录；会话尚未就绪时不再退回已释放的目录。
+- 目录解析会在打开面板和注入属性变化时重新校验，即使旧目录已有供应商，也会切换到新目录并重新订阅；切换会话时重置选择器组件，避免沿用旧的展开、搜索及重试状态。
+- 模型触发按钮与官方选择器一样阻止鼠标按下时的默认焦点转移，避免空白会话切换期间在 click 之前打断按钮交互；不影响搜索框聚焦。
+- 目录查询错误改为当前席位私有，避免一个会话覆盖另一个会话的错误信息。
+
+### 工程
+
+- 补充目录释放 / 重绑定、跨会话状态隔离与有状态 hooks 生命周期回归测试；原有冒烟测试继续覆盖排序、收藏、别名和供应商刷新。发布 CI 同时运行两套测试。
+- 实机回归：用户完全重启 DSH 后确认，切换工作区并新建会话可正常展开双栏列表、切换模型，原问题未复现。
+
 ## [0.2.0] - 2026-11-03
 
 ### 新增
@@ -104,6 +118,7 @@
 
 见 README 的「已知限制」一节。
 
+[0.2.1]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.2.1
 [0.2.0]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.2.0
 [0.1.3]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.3
 [0.1.2]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.2

@@ -1,6 +1,6 @@
 {
   "name": "@aichixiaojuzi/dsh-model-quick-switch",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Provider-first model switcher for the DSH composer. 输入框里的双栏模型切换器：所有供应商一级可见，可拖动排序、别名、收藏与最近使用。",
   "license": "MIT",
   "author": "aichixiaojuzi",
@@ -31,7 +31,7 @@
     "access": "public"
   },
   "scripts": {
-    "test": "node dev/smoke.mjs",
+    "test": "node dev/smoke.mjs && node dev/lifecycle.mjs",
     "check": "node --check client.js && node --check index.js"
   },
   "exports": {

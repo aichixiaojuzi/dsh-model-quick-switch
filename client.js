@@ -703,23 +703,22 @@ window.__ModuleLoader__.load({
         }
       }, [props.load, directory])
 
-      // Retry the directory lookup: the seat stays visible while the host
-      // finishes retaining the session, then turns into the real switch.
+      // Revalidate even when we already have a directory: workspace/session
+      // retention can replace its binding while this component stays mounted.
+      // Never keep displaying a released store just because it has groups.
       useEffect(() => {
-        if (directory || !resolveDirectory) return undefined
+        if (!resolveDirectory) return undefined
         let attempts = 0
         let timer = null
         const tick = () => {
           let next = null
           try { next = resolveDirectory() } catch (error) { next = null }
-          if (next) {
-            setDirectory(next)
-            return
-          }
+          if (next !== directory) setDirectory(next)
+          if (next) return
           attempts += 1
           if (attempts < 240) timer = window.setTimeout(tick, 250)
         }
-        timer = window.setTimeout(tick, 100)
+        tick()
         return () => { if (timer !== null) window.clearTimeout(timer) }
       }, [directory, resolveDirectory, open])
 
@@ -1058,6 +1057,10 @@ window.__ModuleLoader__.load({
           title: triggerTitle,
           'aria-haspopup': 'dialog',
           'aria-expanded': open ? 'true' : 'false',
+          // Keep the composer focus stable until click is dispatched. Blank
+          // session/workspace transitions can otherwise replace this control
+          // between mousedown and click (the shipped picker does this too).
+          onMouseDown: event => event.preventDefault(),
           onClick: () => setOpen(value => !value),
         },
           h('span', { className: 'dqms-trigger-icon' }, iconModels()),
@@ -1502,7 +1505,7 @@ window.__ModuleLoader__.load({
             ),
           )
         }
-        return h(React.Fragment, { key: this.state.epoch }, h(QuickSwitch, this.props))
+        return h(React.Fragment, { key: `${this.props.sessionId}:${this.state.epoch}` }, h(QuickSwitch, this.props))
       }
     }
 
@@ -1524,29 +1527,10 @@ window.__ModuleLoader__.load({
           const sessions = scope.sessions
           const locale = scope.locale
 
-          // One directory per session: the snapshot store must keep a stable
-          // identity across renders, and a failed lookup must be retryable.
-          const directories = new Map()
-          let lookupError = null
-          const directoryFor = (sessionId, force) => {
-            if (!force) {
-              const cached = directories.get(sessionId)
-              if (cached) return cached
-            }
-            let directory = null
-            try {
-              directory = models.directoryFor(sessionId)
-              lookupError = null
-            } catch (error) {
-              lookupError = error && error.message ? error.message : String(error)
-              directory = null
-            }
-            if (directory && directory.store) {
-              directories.set(sessionId, directory)
-              return directory
-            }
-            return directories.get(sessionId) || null
-          }
+          // The shipped resolver owns caching by retained session binding, not
+          // session id. A workspace switch can release that binding; keeping a
+          // second cache here would return a disposed, permanently stale store.
+          // Resolve lazily in each occupant so lookup failures are session-local.
 
           const isSubagent = sessionId => {
             try {
@@ -1560,13 +1544,24 @@ window.__ModuleLoader__.load({
             priority: -1,
             inject: sessionId => {
               const copy = pickCopy(locale)
+              let lookupError = null
+              const directoryFor = () => {
+                try {
+                  const directory = models.directoryFor(sessionId)
+                  lookupError = null
+                  return directory && directory.store ? directory : null
+                } catch (error) {
+                  lookupError = error && error.message ? error.message : String(error)
+                  return null
+                }
+              }
               return {
                 copy,
                 subagent: isSubagent(sessionId),
-                resolveDirectory: force => directoryFor(sessionId, force === true),
+                resolveDirectory: () => directoryFor(),
                 lookupError: () => lookupError,
                 load: force => {
-                  const directory = directoryFor(sessionId, force === true)
+                  const directory = directoryFor()
                   if (!directory) return undefined
                   // Tolerate both shapes: the directory loading itself, or its
                   // snapshot store doing the load.
@@ -1592,7 +1587,7 @@ window.__ModuleLoader__.load({
                   return (text && typeof text === 'object' && text.en) || ''
                 },
                 select: selection => {
-                  const directory = directoryFor(sessionId)
+                  const directory = directoryFor()
                   if (!directory || typeof directory.select !== 'function') return Promise.resolve(undefined)
                   try { return directory.select(selection) } catch (error) { return Promise.resolve(undefined) }
                 },

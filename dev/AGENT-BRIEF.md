@@ -11,7 +11,7 @@
 推理档位内联展开、「从面板删除」某个供应商，以及一个强制重新解析目录的 ↻ 按钮。
 
 - 仓库：https://github.com/aichixiaojuzi/dsh-model-quick-switch （public、MIT、话题 `dsh-plugin`）
-- npm：`@aichixiaojuzi/dsh-model-quick-switch`（当前 **0.1.3**，`latest`）
+- npm：`@aichixiaojuzi/dsh-model-quick-switch`（本次补丁版本 **0.2.1**；发布后通过 registry `/latest` 核验）
 - 本机仓库：`C:\Users\Administrator\Documents\deepseek-harness\default-workspace\dsh-model-quick-switch`
 
 ## 架构（读这几个文件就够）
@@ -23,6 +23,7 @@
 | `index.js` | 宿主半片，**故意为空**（`export function apply() {}`）。功能全在浏览器侧，宿主不注册任何东西 |
 | `client.js` | 全部功能（约 1600 行、单文件、**无构建步骤**）：占座、渲染、拖拽排序、别名（供应商 + 模型）、收藏、最近、搜索、推理档位、右键菜单、重新加载 |
 | `dev/smoke.mjs` | 无头渲染测试（stub 掉 React hooks、模块加载器、目录服务）：`node dev/smoke.mjs` |
+| `dev/lifecycle.mjs` | 有状态 hooks / effect / cleanup 生命周期回归测试；发布 CI 与 smoke 一并执行 |
 | `locale/{zh,en}.json` | 文案 |
 
 ## 必须遵守的不变量（都是踩过坑换来的）
@@ -50,6 +51,9 @@
    供应商排序一律在「可见」（未删除）列表上算索引，否则删掉的供应商会占位错位。
 9. 模型目录每次打开面板都按当前会话强制重新解析，供应商右键菜单中的“刷新供应商与模型”走同一强制路径；只更新该会话的供应商/模型目录，不清理本地别名、排序、收藏或隐藏状态。渲染层按供应商 id 去重，保留目录第一次出现的记录，不合并不同 id 的同名供应商；加载失败的供应商保留在错误状态中，但不作为左栏供应商行显示。
 
+10. **目录生命周期以官方 retained binding 为准，不要按 sessionId 再做一层 Map 缓存**。跨工作区 / 空白会话切换会释放并重建 binding；同一个 ID 也可能对应新目录。打开面板及注入属性变化时要重解析、替换订阅，解析失败不得回退已释放的目录。`SeatBoundary` 的子树 key 必须包含 sessionId，触发按钮保留与官方一致的 `onMouseDown.preventDefault()` 焦点保护。
+11. `node dev/lifecycle.mjs` 是有状态 hooks / effect / cleanup 回归测试，验证点击开关与目录重绑定；它不是浏览器 DOM / CSS / 焦点测试，不能替代完全重启后对「切工作区 → 新会话 → 点模型」的实际验证。
+
 ## 本机开发安装（`link:` 方式）
 
 profile 目录：`C:\Users\Administrator\.dsh\profiles\desktop`。**改名时四处必须一致**：
@@ -68,7 +72,7 @@ profile 目录：`C:\Users\Administrator\.dsh\profiles\desktop`。**改名时四
 1. **开场白**：新对话的第一句写
    「读 `dev/AGENT-BRIEF.md` 和 `CHANGELOG.md`，然后我要改：〈一句话说清要改什么〉」
    —— 不必复述项目背景，这份文件里都有。
-2. **改 + 自测**：改完 `node dev/smoke.mjs` 必须全绿；动了界面就**完全重启 DSH 应用**
+2. **改 + 自测**：改完 `node dev/smoke.mjs` 和 `node dev/lifecycle.mjs` 必须全绿；动了界面就**完全重启 DSH 应用**
    （不是刷新页面），在输入框里实际点一遍。本机 profile 用 `link:` 指向这个仓库，
    所以改动保存后重启即生效（见下面「本机开发安装」）。
 3. **发版**：`package.json` 版本 +1 → `CHANGELOG.md` 加一节 → 提交 → 打 tag → 推 tag
@@ -138,7 +142,7 @@ bypass 2fa tokens」，所以**一次性令牌再也发不了版**——不要�
 - **收录 PR**（`awesome-dsh-plugin/awesome-dsh-plugin`）：仓库满 24 小时后才能提
   （**2026-11-03 00:12** 之后）。条目草案 `_publish\catalog-entry.yml`；
   规则核实见 `_publish\CATALOG-SPEC.md`；操作指引见 `_publish\PR-STEPS.md`。
-- npm 上的 **0.1.1 有缺陷**（客户端 id 未随改名同步），不要使用；`latest` 已是 0.1.3。
+- npm 上的 **0.1.1 有缺陷**（客户端 id 未随改名同步），不要使用；历史 `latest` 信息不要沿用，发布后以 registry `/latest` 返回为准。
 - 发布改成 **`publish.yml` + Trusted Publishing**；`_publish\PUBLISH-STEPS.md` 里的一次性
   2FA 令牌流程只作为备用。改发布工作流文件名时，**必须同步改 npmjs.com 上的
   Trusted Publisher 配置**，否则发布报 E404。
@@ -151,3 +155,8 @@ bypass 2fa tokens」，所以**一次性令牌再也发不了版**——不要�
 - PowerShell 5.1 里 `Get-Content` / `Set-Content` 读写 UTF-8 文件会按 ANSI 解码而读坏中文，
   要用 `-Encoding UTF8`，或交给编辑器 / Node 处理。
 - 远端验证交给 `web_fetch`（GitHub API、registry.npmjs.org），本机 pwsh 出网不稳。
+
+## 0.2.1 实机回归（2026-11-05）
+
+- 用户已完全重启 DSH，并确认切换工作区、新建会话后可正常打开双栏模型列表和切换模型，原问题未复现。
+- 发布 CI 现在运行 smoke 与 lifecycle 两套测试；版本由 `package.json` 和标签共同校验。

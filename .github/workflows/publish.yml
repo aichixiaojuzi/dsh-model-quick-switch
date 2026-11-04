@@ -57,9 +57,10 @@ jobs:
           node --check client.js
           node --check index.js
           node --check dev/smoke.mjs
+          node --check dev/lifecycle.mjs
 
-      - name: Smoke test
-        run: node dev/smoke.mjs
+      - name: Smoke and lifecycle tests
+        run: npm test
 
       # Trusted publishing needs a token from this workflow's OIDC identity. These
       # facts are emitted as annotations on purpose: annotations are readable by

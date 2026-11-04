@@ -640,4 +640,36 @@ runScenario('empty catalog offers a retry', seedWith({ 2: true }), {
   expect: ['这个会话暂时没有可用的供应商', '重试'],
 })
 
+/* --- retained session bindings can change without restarting the plugin --- */
+
+const originalDirectoryFor = scope.modelDirectories.directoryFor
+let residentDirectory = makeDirectory()
+let residentError = false
+scope.modelDirectories.directoryFor = sessionId => {
+  if (residentError) throw new Error('session not retained: ' + sessionId)
+  return residentDirectory
+}
+const reboundProps = registration.options.inject('rebound-session')
+const previousDirectory = reboundProps.resolveDirectory()
+residentDirectory = makeDirectory()
+check('rebound session resolves its new resident directory',
+  reboundProps.resolveDirectory() === residentDirectory, true)
+check('rebound session does not reuse its released directory',
+  reboundProps.resolveDirectory() === previousDirectory, false)
+residentError = true
+check('unretained session never falls back to a released directory',
+  reboundProps.resolveDirectory(), null)
+const otherSessionProps = registration.options.inject('other-session')
+otherSessionProps.resolveDirectory()
+residentError = false
+reboundProps.resolveDirectory(true)
+check('lookup failures belong to the session that failed',
+  otherSessionProps.lookupError(), 'session not retained: other-session')
+scope.modelDirectories.directoryFor = originalDirectoryFor
+
+const boundaryA = new registration.component({ sessionId: 'workspace-a-session' })
+const boundaryB = new registration.component({ sessionId: 'workspace-b-session' })
+check('switching sessions gives the picker a fresh component lifetime',
+  boundaryA.render().props.key !== boundaryB.render().props.key, true)
+
 console.log(process.exitCode ? 'smoke: FAILED' : 'smoke: provider menu and preference checks passed')
