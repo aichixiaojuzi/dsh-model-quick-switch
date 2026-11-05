@@ -79,7 +79,7 @@ function harness() {
   React.useLayoutEffect = React.useEffect
   const require = id => {
     if (id === 'react') return React
-    if (id === 'react-dom') return { createPortal: node => node }
+    if (id === 'react-dom') return { createPortal: (node, container) => ({ type: 'portal', props: { container }, children: [node] }) }
     throw new Error(`unexpected require: ${id}`)
   }
   new Function('window', 'document', 'navigator', source)(window, document, { language: 'en' })
@@ -127,7 +127,9 @@ function harness() {
             if (node.props.ref) node.props.ref.current = {
               getBoundingClientRect: () => ({ left: 100, top: 650, bottom: 678 }),
               contains: target => target === node,
-              focus() { runtime.focused = node }, querySelector: () => null,
+              focus(options) { runtime.focused = node; runtime.focusOptions = options },
+              querySelector: () => runtime.cursorRow || null,
+              clientTop: 0, clientHeight: 100, scrollTop: runtime.listScrollTop || 0,
             }
           }
           for (const effect of this.effects) effect()
@@ -151,7 +153,7 @@ function harness() {
       timers.delete(due[0]); due[1].fn(); runtime.flush()
     }
   }
-  return { bindings, directory, mount, advance, registration, timers, listeners, nodes, cleanup() { for (const fn of resources) if (typeof fn === 'function') fn() } }
+  return { document, window, bindings, directory, mount, advance, registration, timers, listeners, nodes, cleanup() { for (const fn of resources) if (typeof fn === 'function') fn() } }
 }
 
 let passed = 0
@@ -178,6 +180,56 @@ await test('closed -> mousedown preventDefault -> click -> open with both column
   h.advance(r, 0)
   assert.ok(r.focused, 'open effect focuses simulated search ref')
   r.unmount(); assert.equal(h.timers.size, 0); assert.equal(h.listeners.size, 0)
+})
+
+await test('floating panel and menu portal to body; focus never scrolls host', h => {
+  h.bindings.set('a', h.directory('alpha'))
+  const r = h.mount('a')
+  r.clickOpen(); h.advance(r, 0)
+  const portal = h.nodes(r.tree).find(node => node.type === 'portal')
+  assert.equal(portal?.props.container, h.document.body)
+  assert.deepEqual(r.focusOptions, { preventScroll: true })
+  const row = h.nodes(r.tree).find(node => node.props.className === 'dqms-row')
+  row.props.onContextMenu({ preventDefault() {}, stopPropagation() {}, clientX: 400, clientY: 400 })
+  r.flush()
+  const floating = h.nodes(r.tree).find(node => node.type === 'portal')
+  assert.ok(h.nodes(floating).some(node => node.props.className === 'dqms-menu'))
+  assert.ok(!h.nodes(r.find('dqms-panel')).some(node => node.props.className === 'dqms-menu'), 'menu must escape panel clipping too')
+  for (const listener of h.listeners) {
+    if (listener.prefix === 'document' && listener.type === 'mousedown') listener.fn({ target: r.find('dqms-menu') })
+  }
+  r.flush()
+  assert.ok(r.find('dqms-panel'), 'portal menu mousedown must not close the panel before click')
+  r.unmount()
+})
+
+await test('keyboard visibility scrolls list only, never scrollIntoView ancestors', h => {
+  h.bindings.set('a', h.directory('alpha'))
+  const r = h.mount('a')
+  let ancestorScrolls = 0
+  r.cursorRow = {
+    getBoundingClientRect: () => ({ top: 780, bottom: 810 }),
+    scrollIntoView() { ancestorScrolls++ },
+  }
+  r.clickOpen()
+  assert.equal(ancestorScrolls, 0, 'opening must not scroll an ancestor')
+  r.find('dqms-list').props.onKeyDown({ key: 'ArrowDown', preventDefault() {} })
+  r.flush()
+  const list = r.find('dqms-list').props.ref.current
+  assert.equal(list.scrollTop, 60, 'only adjust list by row overflow')
+  assert.equal(ancestorScrolls, 0)
+  r.unmount()
+})
+
+await test('panel fits short narrow viewport without minimum-height overflow', h => {
+  h.window.innerWidth = 360; h.window.innerHeight = 240
+  h.bindings.set('a', h.directory('alpha'))
+  const r = h.mount('a'); r.clickOpen()
+  const style = r.find('dqms-panel').props.style
+  assert.equal(style.width, '336px'); assert.equal(style.height, '216px')
+  assert.ok(parseFloat(style.top) >= 12)
+  assert.ok(parseFloat(style.top) + parseFloat(style.height) <= 228)
+  r.unmount()
 })
 
 await test('same mounted component + new injected resolver replaces directory subscription', h => {

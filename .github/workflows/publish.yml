@@ -24,6 +24,9 @@ permissions:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # create the GitHub Release after npm publication
+      id-token: write
     steps:
       - uses: actions/checkout@v7
 
@@ -143,6 +146,27 @@ jobs:
             done
             exit "$code"
           fi
+
+      - name: Create GitHub Release from changelog
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const version = JSON.parse(readFileSync('package.json', 'utf8')).version
+          const changelog = readFileSync('CHANGELOG.md', 'utf8')
+          const marker = `## [${version}]`
+          const start = changelog.indexOf(marker)
+          if (start < 0) throw new Error(`Missing changelog section: ${version}`)
+          const bodyStart = changelog.indexOf('\n', start) + 1
+          const next = changelog.indexOf('\n## [', bodyStart)
+          const notes = changelog.slice(bodyStart, next < 0 ? undefined : next).trim()
+          if (!notes) throw new Error(`Empty changelog section: ${version}`)
+          writeFileSync('release-notes.md', notes + '\n')
+          NODE
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "$GITHUB_REF_NAME" --notes-file release-notes.md --latest
 
       # Manual dispatch from a branch: list what would be packed, without contacting
       # the registry. "npm publish --dry-run" is deliberately NOT used: it still runs

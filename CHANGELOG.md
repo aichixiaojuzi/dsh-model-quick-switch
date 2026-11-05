@@ -2,6 +2,20 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)；每个版本都会打 Git tag。
 
+## [0.2.2] - 2026-11-05
+
+### 修复
+
+- 模型面板及右键菜单通过 React portal 挂载到 `document.body`，避免输入框祖先的变换、裁切和滚动容器影响视口坐标定位；右键菜单不再放在面板的裁切区域内。
+- 搜索框、键盘列表聚焦使用 `preventScroll`；键盘导航仅调整模型列表自身的 `scrollTop`，不再通过 `scrollIntoView` 带动宿主对话区滚动。
+- 面板采用 border-box 尺寸，按视口可用高度收缩并限制上下边界，移除与定位计算不一致的窄屏宽度覆盖。
+
+### 工程
+
+- 增加 portal 挂载目标、右键菜单裁切隔离、防滚动焦点、列表局部滚动和小视口边界的模拟 hooks 回归断言。
+- 实机验收：用户确认本次布局错位 bug 已修复。
+- 标签发布流程在 npm 发布成功后，自动从本版本更新日志生成 GitHub Release。
+
 ## [0.2.1] - 2026-11-05
 
 ### 修复
@@ -118,6 +132,7 @@
 
 见 README 的「已知限制」一节。
 
+[0.2.2]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.2.2
 [0.2.1]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.2.1
 [0.2.0]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.2.0
 [0.1.3]: https://github.com/aichixiaojuzi/dsh-model-quick-switch/releases/tag/v0.1.3

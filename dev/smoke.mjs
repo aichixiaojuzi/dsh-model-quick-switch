@@ -90,6 +90,7 @@ const React = {
 
 const requireStub = id => {
   if (id === 'react' || id === 'react/jsx-runtime') return React
+  if (id === 'react-dom') return { createPortal: (node, container) => buildElement('portal', { container }, [node]) }
   throw new Error('smoke: unexpected require(' + id + ')')
 }
 

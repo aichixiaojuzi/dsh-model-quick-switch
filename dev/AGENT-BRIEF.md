@@ -11,7 +11,7 @@
 推理档位内联展开、「从面板删除」某个供应商，以及一个强制重新解析目录的 ↻ 按钮。
 
 - 仓库：https://github.com/aichixiaojuzi/dsh-model-quick-switch （public、MIT、话题 `dsh-plugin`）
-- npm：`@aichixiaojuzi/dsh-model-quick-switch`（本次补丁版本 **0.2.1**；发布后通过 registry `/latest` 核验）
+- npm：`@aichixiaojuzi/dsh-model-quick-switch`（本次补丁版本 **0.2.2**；发布后通过 registry `/latest` 核验）
 - 本机仓库：`C:\Users\Administrator\Documents\deepseek-harness\default-workspace\dsh-model-quick-switch`
 
 ## 架构（读这几个文件就够）
@@ -53,6 +53,7 @@
 
 10. **目录生命周期以官方 retained binding 为准，不要按 sessionId 再做一层 Map 缓存**。跨工作区 / 空白会话切换会释放并重建 binding；同一个 ID 也可能对应新目录。打开面板及注入属性变化时要重解析、替换订阅，解析失败不得回退已释放的目录。`SeatBoundary` 的子树 key 必须包含 sessionId，触发按钮保留与官方一致的 `onMouseDown.preventDefault()` 焦点保护。
 11. `node dev/lifecycle.mjs` 是有状态 hooks / effect / cleanup 回归测试，验证点击开关与目录重绑定；它不是浏览器 DOM / CSS / 焦点测试，不能替代完全重启后对「切工作区 → 新会话 → 点模型」的实际验证。
+12. **浮层必须使用 `react-dom.createPortal` 挂到 `document.body`**，面板和右键菜单作为同级浮层，不能挂在输入框祖先 / 面板裁切区内；坐标使用视口坐标。显式聚焦使用 `preventScroll: true`，键盘可见性只调整列表自身 `scrollTop`，禁止用会滚动宿主祖先的 `scrollIntoView`。
 
 ## 本机开发安装（`link:` 方式）
 
@@ -160,3 +161,9 @@ bypass 2fa tokens」，所以**一次性令牌再也发不了版**——不要�
 
 - 用户已完全重启 DSH，并确认切换工作区、新建会话后可正常打开双栏模型列表和切换模型，原问题未复现。
 - 发布 CI 现在运行 smoke 与 lifecycle 两套测试；版本由 `package.json` 和标签共同校验。
+
+## 0.2.2 实机回归与发布准备（2026-11-05）
+
+- 用户确认打开模型选择器引起对话区偏移、面板显示不全的 bug 已修复，并授权发布新版。
+- 浮层 portal、焦点防滚动、列表局部滚动及小视口边界已补回归断言，lifecycle 共 11 项。
+- 标签工作流在 npm 发布成功后，从对应 CHANGELOG 小节自动创建 GitHub Release；发布 job 需要 `contents: write` 和 `id-token: write`。

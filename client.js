@@ -12,6 +12,7 @@ window.__ModuleLoader__.load({
   id: '@aichixiaojuzi/dsh-model-quick-switch',
   factory(require) {
     const React = require('react')
+    const { createPortal } = require('react-dom')
     const { useCallback, useEffect, useRef, useState } = React
     const h = React.createElement
 
@@ -400,7 +401,7 @@ window.__ModuleLoader__.load({
 .dqms-chevron{display:inline-flex;color:var(--dsw-alias-label-secondary)}
 .dqms-spin{width:12px;height:12px;border-radius:50%;border:1.6px solid var(--dsw-alias-border-l2);border-top-color:var(--dsw-alias-brand-primary);animation:dqms-rotate .7s linear infinite;flex:none}
 @keyframes dqms-rotate{to{transform:rotate(360deg)}}
-.dqms-panel{position:fixed;z-index:2147482000;display:flex;flex-direction:column;overflow:hidden;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.32);font-size:13px}
+.dqms-panel{box-sizing:border-box;position:fixed;z-index:2147482000;display:flex;flex-direction:column;overflow:hidden;background:var(--dsw-alias-bg-overlay);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:12px;box-shadow:0 18px 48px rgba(0,0,0,.32);font-size:13px}
 .dqms-search{display:flex;align-items:center;gap:8px;padding:8px 10px;border-bottom:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary)}
 .dqms-search input{flex:1;min-width:0;background:transparent;border:0;outline:0;color:var(--dsw-alias-label-primary);font:inherit}
 .dqms-search input::placeholder{color:var(--dsw-alias-label-secondary)}
@@ -466,7 +467,7 @@ window.__ModuleLoader__.load({
 .dqms-menu-sep{height:1px;margin:4px 6px;background:var(--dsw-alias-border-l1)}
 .dqms-badge{flex:none;padding:1px 6px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);font-size:10px;letter-spacing:.02em}
 .dqms-fail-body{display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:0}
-@media (max-width:520px){.dqms-panel{width:calc(100vw - 16px)!important}.dqms-rail{width:132px}}
+@media (max-width:520px){.dqms-rail{width:132px}}
 `
 
     function installStyles() {
@@ -644,13 +645,12 @@ window.__ModuleLoader__.load({
         const element = triggerRef.current
         if (!element) return
         const rect = element.getBoundingClientRect()
-        const width = Math.min(560, window.innerWidth - 24)
-        const height = Math.min(396, Math.max(260, window.innerHeight - 40))
+        const width = Math.max(1, Math.min(560, window.innerWidth - 24))
+        const height = Math.max(1, Math.min(396, window.innerHeight - 24))
         const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
         const above = rect.top > height + 24
-        const top = above
-          ? Math.max(12, rect.top - 8 - height)
-          : Math.min(rect.bottom + 8, window.innerHeight - height - 12)
+        const preferredTop = above ? rect.top - 8 - height : rect.bottom + 8
+        const top = Math.max(12, Math.min(preferredTop, window.innerHeight - height - 12))
         setBox({ left, top, width, height })
       }, [])
 
@@ -661,6 +661,7 @@ window.__ModuleLoader__.load({
           const panel = panelRef.current
           const trigger = triggerRef.current
           if (panel && panel.contains(event.target)) return
+          if (menuRef.current && menuRef.current.contains(event.target)) return
           if (trigger && trigger.contains(event.target)) return
           setOpen(false)
         }
@@ -687,7 +688,7 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         if (!open) return undefined
         const timer = window.setTimeout(() => {
-          if (searchRef.current) searchRef.current.focus()
+          if (searchRef.current) searchRef.current.focus({ preventScroll: true })
           // Opening the picker refreshes the current session's catalog so
           // provider/model changes made in Settings are reflected immediately.
           if (typeof props.load === 'function') {
@@ -730,9 +731,18 @@ window.__ModuleLoader__.load({
       useEffect(() => {
         const list = listRef.current
         if (!list || !open) return
+        if (!keyboard) return
         const element = list.querySelector('[data-cursor="true"]')
-        if (element && typeof element.scrollIntoView === 'function') element.scrollIntoView({ block: 'nearest' })
-      }, [cursor, open, rows.length])
+        if (!element) return
+        // scrollIntoView also scrolls the composer's overflow ancestors. Only
+        // move our own list; the host conversation must never be scrolled here.
+        const viewport = list.getBoundingClientRect()
+        const row = element.getBoundingClientRect()
+        const top = viewport.top + list.clientTop
+        const bottom = top + list.clientHeight
+        if (row.top < top) list.scrollTop += row.top - top
+        else if (row.bottom > bottom) list.scrollTop += row.bottom - bottom
+      }, [cursor, open, rows.length, keyboard])
 
       // The capture-phase Escape listener needs the latest rename state without
       // re-subscribing on every keystroke.
@@ -1384,7 +1394,9 @@ window.__ModuleLoader__.load({
 
       return h(React.Fragment, null,
         trigger,
-        h('div', {
+        // Viewport coordinates require a viewport-level DOM parent. Composer
+        // ancestors may establish fixed containing blocks or clip overflow.
+        createPortal(h(React.Fragment, null, h('div', {
           ref: panelRef,
           className: 'dqms-panel',
           role: 'dialog',
@@ -1413,7 +1425,7 @@ window.__ModuleLoader__.load({
               onKeyDown: event => {
                 if (event.key === 'ArrowDown' && listRef.current) {
                   event.preventDefault()
-                  listRef.current.focus()
+                  listRef.current.focus({ preventScroll: true })
                   return
                 }
                 if (event.key === 'Enter') {
@@ -1430,7 +1442,7 @@ window.__ModuleLoader__.load({
                 title: copy.clear,
                 onClick: () => {
                   setQuery('')
-                  if (searchRef.current) searchRef.current.focus()
+                  if (searchRef.current) searchRef.current.focus({ preventScroll: true })
                 },
               }, iconClose())
               : null,
@@ -1467,8 +1479,7 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'dqms-link', onClick: resetOrder }, copy.reset),
           ),
           error ? h('div', { className: 'dqms-error', role: 'alert' }, error) : null,
-          menuNode,
-        ),
+        ), menuNode), document.body),
       )
     }
 
